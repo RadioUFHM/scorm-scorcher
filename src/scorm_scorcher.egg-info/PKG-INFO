@@ -1,18 +1,27 @@
 Metadata-Version: 2.4
 Name: scorm-scorcher
 Version: 0.1.0
-Summary: Convert Video to SCORM Packages
-Author-email: Your Name <you@example.com>
+Summary: Convert video files into SCORM 1.2 packages
+Author-email: fcitradecraft <rio@fcitradecraft.com>
 Requires-Python: >=3.10
 Description-Content-Type: text/markdown
-Requires-Dist: click
+Requires-Dist: click>=8.0
+Provides-Extra: transcribe
+Requires-Dist: openai-whisper; extra == "transcribe"
+Provides-Extra: claude
+Requires-Dist: anthropic>=0.40; extra == "claude"
+Provides-Extra: quiz
+Requires-Dist: anthropic>=0.40; extra == "quiz"
+Requires-Dist: openai>=1.0; extra == "quiz"
+Provides-Extra: xlsx
+Requires-Dist: pandas; extra == "xlsx"
+Requires-Dist: openpyxl; extra == "xlsx"
 Provides-Extra: full
-Requires-Dist: openai; extra == "full"
+Requires-Dist: openai-whisper; extra == "full"
+Requires-Dist: anthropic>=0.40; extra == "full"
+Requires-Dist: openai>=1.0; extra == "full"
 Requires-Dist: pandas; extra == "full"
-Requires-Dist: moviepy; extra == "full"
-Requires-Dist: srt; extra == "full"
-Requires-Dist: python-docx; extra == "full"
-Requires-Dist: jinja2; extra == "full"
+Requires-Dist: openpyxl; extra == "full"
 
 # scorm-scorcher
 

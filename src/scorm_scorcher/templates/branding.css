@@ -1,7 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Lora&display=swap');
-
 body {
-    font-family: 'Lora', serif;
+    font-family: Georgia, 'Times New Roman', serif;
     margin: 0;
     background-color: #f8f9fa;
     color: #000000;
@@ -19,7 +17,7 @@ body {
 }
 
 .sidebar h2 {
-    font-family: 'Montserrat', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
     margin-top: 0;
 }
 
@@ -50,7 +48,7 @@ main {
 }
 
 h1 {
-    font-family: 'Montserrat', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
     color: #374B82;
 }
 

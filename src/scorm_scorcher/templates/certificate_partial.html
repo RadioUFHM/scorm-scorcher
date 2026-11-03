@@ -1,0 +1,98 @@
+<style>
+  #certificate-view {
+    background: #fff;
+    border: 3px solid #0d1b2a;
+    border-radius: 8px;
+    padding: 48px 40px;
+    text-align: center;
+    margin-top: 24px;
+  }
+  #certificate-view .cert-letterhead {
+    font-size: 1.1rem;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #0d1b2a;
+    margin-bottom: 4px;
+  }
+  #certificate-view .cert-subhead {
+    font-size: 0.8rem;
+    color: #666;
+    margin-bottom: 28px;
+  }
+  #certificate-view .cert-title {
+    font-size: 1.6rem;
+    color: #0d1b2a;
+    margin: 0 0 24px;
+  }
+  #certificate-view .cert-intro {
+    font-size: 0.95rem;
+    color: #555;
+    margin: 0 0 8px;
+  }
+  #certificate-view .cert-name {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #222;
+    margin: 0 0 20px;
+    border-bottom: 2px solid #ddd;
+    display: inline-block;
+    padding-bottom: 8px;
+  }
+  #certificate-view .cert-course {
+    font-size: 1.1rem;
+    color: #333;
+    margin: 0 0 20px;
+  }
+  #certificate-view .cert-meta {
+    font-size: 0.85rem;
+    color: #666;
+    margin: 0 0 28px;
+  }
+
+  @media print {
+    body > *:not(#certificate-view) { display: none !important; }
+    #certificate-view {
+      border: none;
+      margin: 0;
+    }
+    #certificate-view .cert-print-btn { display: none !important; }
+  }
+</style>
+
+<div id="certificate-view" class="hidden">
+  <div class="cert-letterhead">FCI Tradecraft</div>
+  <div class="cert-subhead">AML / CFT Training</div>
+  <h2 class="cert-title">Certificate of Completion</h2>
+  <p class="cert-intro">This certifies that</p>
+  <p class="cert-name" id="cert-name"></p>
+  <p class="cert-course" id="cert-course"></p>
+  <p class="cert-meta" id="cert-meta"></p>
+  <button class="retry-btn cert-print-btn" onclick="window.print()">Print / Save as PDF</button>
+</div>
+
+<script>
+  /* Best-effort "Last, First" -> "First Last" reformat for display; falls
+     back to the raw SCORM value unmodified if it doesn't match. */
+  function formatLearnerName(raw) {
+    if (!raw) return 'Learner';
+    var parts = raw.split(',');
+    if (parts.length === 2 && parts[0].trim() && parts[1].trim()) {
+      return (parts[1].trim() + ' ' + parts[0].trim());
+    }
+    return raw;
+  }
+
+  function renderCertificate(data) {
+    document.getElementById('cert-name').textContent = data.learnerName;
+    document.getElementById('cert-course').textContent = data.courseTitle;
+    document.getElementById('cert-meta').textContent =
+      'Score: ' + data.scorePercent + '%  •  ' + data.dateStr;
+  }
+
+  function showCertificate() {
+    var el = document.getElementById('certificate-view');
+    el.classList.remove('hidden');
+    el.scrollIntoView({ behavior: 'smooth' });
+  }
+</script>
