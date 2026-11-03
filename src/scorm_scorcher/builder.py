@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from pathlib import Path
 from typing import List
+from xml.sax.saxutils import escape as _xml_escape
 
 from .video_processing import download_for_embed
 
@@ -147,6 +149,26 @@ _SCORM_2004 = {
 
 SCORM_VERSIONS = {"1.2": _SCORM_1P2, "2004": _SCORM_2004}
 
+_XML_QUOTES = {'"': "&quot;", "'": "&apos;"}
+
+
+def _xml_text(value: str) -> str:
+    """Escape a user-supplied value for XML text or a quoted attribute."""
+    return _xml_escape(value, _XML_QUOTES)
+
+
+def _manifest_identifier(title: str) -> str:
+    """Build a manifest identifier that is a valid xs:ID (an XML NCName).
+
+    Escaping alone is not enough: "AML_&amp;_SANCTIONS" would parse but is not
+    a valid ID. Anything outside letters, digits, '_', '-' and '.' becomes '_',
+    and a leading character that cannot start an NCName gets an 'ID_' prefix.
+    """
+    ident = re.sub(r"[^A-Za-z0-9_.-]", "_", title).upper() + "_SCORM"
+    if not re.match(r"[A-Za-z_]", ident):
+        ident = "ID_" + ident
+    return ident
+
 
 def generate_manifest(
     title: str,
@@ -167,7 +189,8 @@ def generate_manifest(
         )
     cfg = SCORM_VERSIONS[scorm_version]
 
-    identifier = title.replace(" ", "_").upper() + "_SCORM"
+    identifier = _manifest_identifier(title)
+    title_xml = _xml_text(title)
 
     xmlns_lines = []
     schema_pairs = []
@@ -208,9 +231,9 @@ def generate_manifest(
   </metadata>
   <organizations default="ORG1">
     <organization identifier="ORG1">
-      <title>{title}</title>
+      <title>{title_xml}</title>
       <item identifier="ITEM1" identifierref="RES1">
-        <title>{title}</title>
+        <title>{title_xml}</title>
       </item>
 {quiz_items}    </organization>
   </organizations>

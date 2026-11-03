@@ -1,6 +1,8 @@
 """Tests for builder.py — HTML and manifest generation."""
 
 import json
+import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import patch
 
@@ -169,3 +171,39 @@ def test_generate_manifest_2004_without_quiz(tmp_path):
 def test_generate_manifest_unknown_version_raises(tmp_path):
     with pytest.raises(ValueError):
         generate_manifest("My Lesson", tmp_path, scorm_version="3.0")
+
+
+# --- Manifest escaping: parse the generated XML, never compare strings ---
+
+_NCNAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]*$")
+
+SPECIAL_TITLES = [
+    "AML & Sanctions",
+    "Less <than> greater",
+    'Say "hello"',
+    "Rio's course",
+    "All & <of> \"them\" 'together'",
+    "2026 KYC refresher",
+]
+
+
+def _local(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+@pytest.mark.parametrize("version", ["1.2", "2004"])
+@pytest.mark.parametrize("title", SPECIAL_TITLES)
+def test_manifest_title_round_trips_through_xml_parser(tmp_path, title, version):
+    path = generate_manifest(title, tmp_path, include_quiz=True, scorm_version=version)
+    root = ET.parse(path).getroot()  # raises ParseError if the manifest is malformed
+
+    titles = [el.text for el in root.iter() if _local(el.tag) == "title"]
+    # Organization title + lesson item title carry the user's title; the quiz item is "Quiz".
+    assert titles.count(title) == 2
+    assert "Quiz" in titles
+
+
+@pytest.mark.parametrize("title", SPECIAL_TITLES)
+def test_manifest_identifier_is_valid_xml_id(tmp_path, title):
+    root = ET.parse(generate_manifest(title, tmp_path)).getroot()
+    assert _NCNAME.match(root.get("identifier"))
