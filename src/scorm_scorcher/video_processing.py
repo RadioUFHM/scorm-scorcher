@@ -86,15 +86,16 @@ def process_video(
     out_dir = Path(work_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # Check the local input first: a missing file is the more actionable error.
+    is_url = _is_url(video_source)
+    if not is_url and not Path(video_source).exists():
+        raise FileNotFoundError(f"Video file not found: {video_source}")
+
+    # Check ffmpeg before any download so a URL isn't fetched for nothing.
     if shutil.which("ffmpeg") is None:
         raise EnvironmentError("ffmpeg is required but was not found on PATH")
 
-    if _is_url(video_source):
-        src = download_for_embed(video_source, out_dir)
-    else:
-        src = Path(video_source)
-        if not src.exists():
-            raise FileNotFoundError(f"Video file not found: {video_source}")
+    src = download_for_embed(video_source, out_dir) if is_url else Path(video_source)
 
     # Extract audio for Whisper transcription
     audio_path = out_dir / "audio.mp3"

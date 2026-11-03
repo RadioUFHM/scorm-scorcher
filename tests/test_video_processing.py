@@ -20,6 +20,12 @@ def test_missing_local_file_raises(tmp_path):
         process_video("/nonexistent/video.mp4", str(tmp_path))
 
 
+def test_missing_local_file_reported_before_missing_ffmpeg(tmp_path, monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda _: None)
+    with pytest.raises(FileNotFoundError):
+        process_video("/nonexistent/video.mp4", str(tmp_path))
+
+
 def test_missing_ffmpeg_raises(tmp_path, monkeypatch):
     video = tmp_path / "v.mp4"
     video.write_bytes(b"")
