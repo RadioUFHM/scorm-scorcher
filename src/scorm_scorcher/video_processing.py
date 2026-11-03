@@ -30,6 +30,36 @@ def _download_video(url: str, dest: Path) -> None:
     print(f"Saved to {dest}")
 
 
+SOURCE_URL_MARKER = ".video_source_url"
+
+
+def download_for_embed(url: str, dest_dir: Path) -> Path:
+    """Download url into dest_dir, or reuse an existing cached copy if the
+    same url was already downloaded there.
+
+    Shared by prepare()'s transcription source and by --video-mode embed
+    builds that reference a remote master, so a multi-hundred-MB video isn't
+    downloaded twice across a prepare + build pair pointed at the same
+    output directory.
+    """
+    dest_dir = Path(dest_dir)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    marker = dest_dir / SOURCE_URL_MARKER
+    suffix = Path(url.split("?")[0]).suffix or ".mp4"
+    local_copy = dest_dir / f"_source{suffix}"
+
+    if (
+        local_copy.exists()
+        and marker.exists()
+        and marker.read_text(encoding="utf-8").strip() == url
+    ):
+        return local_copy
+
+    _download_video(url, local_copy)
+    marker.write_text(url, encoding="utf-8")
+    return local_copy
+
+
 def process_video(
     video_source: str,
     work_dir: str,
@@ -60,10 +90,7 @@ def process_video(
         raise EnvironmentError("ffmpeg is required but was not found on PATH")
 
     if _is_url(video_source):
-        suffix = Path(video_source.split("?")[0]).suffix or ".mp4"
-        local_copy = out_dir / f"_source{suffix}"
-        _download_video(video_source, local_copy)
-        src = local_copy
+        src = download_for_embed(video_source, out_dir)
     else:
         src = Path(video_source)
         if not src.exists():

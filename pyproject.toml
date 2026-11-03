@@ -15,12 +15,14 @@ scorm-scorcher = "scorm_scorcher.cli:main"
 [project.optional-dependencies]
 # Whisper for local audio transcription
 transcribe = ["openai-whisper"]
-# OpenAI API for AI-generated quiz questions
-quiz = ["openai>=1.0"]
+# Claude (Anthropic) API for AI-generated quiz questions — preferred
+claude = ["anthropic>=0.40"]
+# OpenAI API for AI-generated quiz questions — fallback
+quiz = ["anthropic>=0.40", "openai>=1.0"]
 # XLSX quiz export
 xlsx = ["pandas", "openpyxl"]
 # Everything
-full = ["openai-whisper", "openai>=1.0", "pandas", "openpyxl"]
+full = ["openai-whisper", "anthropic>=0.40", "openai>=1.0", "pandas", "openpyxl"]
 
 [build-system]
 requires = ["setuptools>=61.0"]

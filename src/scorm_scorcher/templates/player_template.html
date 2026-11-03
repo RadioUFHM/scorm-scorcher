@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="branding.css" />
 
   <style>
+    .hidden { display: none !important; }
+
     #video-container {
       width: 100%;
       max-width: 960px;
@@ -111,6 +113,24 @@
       #sidebar { width: 100%; order: 2; margin-top: 15px; }
       #transcript-container { order: 1; }
     }
+
+    #license-expired-panel {
+      max-width: 960px;
+      margin: 0 auto 20px;
+      padding: 32px 28px;
+      background: #f7f7f7;
+      border: 2px solid #0d1b2a;
+      border-radius: 8px;
+      text-align: center;
+    }
+    #license-expired-panel h2 {
+      margin: 0 0 10px;
+      color: #0d1b2a;
+    }
+    #license-expired-panel p {
+      margin: 0;
+      color: #333;
+    }
   </style>
 </head>
 <body>
@@ -125,13 +145,14 @@
   </video>
 </div>
 
+<div id="license-expired-panel" class="hidden" role="alert">
+  <h2>Training License Expired</h2>
+  <p id="license-expired-message"></p>
+</div>
+
 <main>
   <div id="sidebar">
     <h2>Lesson Sections</h2>
-    <div
-      id="seek-warning"
-      style="display:none; padding:8px; margin-bottom:10px; border:1px solid #ffeeba; background:#fff3cd; border-radius:4px; color:#856404; font-size:0.9em;"
-    ></div>
     <ul id="section-list"></ul>
   </div>
 
@@ -142,6 +163,7 @@
   </div>
 </main>
 
+<script src="scorm-shim.js"></script>
 <script>
   const transcript = {{TRANSCRIPT_JSON}};
   const sections = {{SECTIONS_JSON}};
@@ -149,37 +171,89 @@
   const videoType = "{{VIDEO_TYPE}}";
   const transcriptTable = document.querySelector("#transcript-table tbody");
   const sectionList = document.querySelector("#section-list");
-  const seekWarning = document.getElementById("seek-warning");
 
   let videoPlayer = null;
   let youtubePlayer = null;
   let isYouTube = false;
-  let isLearnWorlds = false;
 
-  if (videoUrl.includes("learnworlds") || videoType === "learnworlds") {
-    isLearnWorlds = true;
-    if (seekWarning) {
-      seekWarning.textContent = "Seeking is disabled for LearnWorlds-hosted videos.";
-      seekWarning.style.display = "block";
+  /* ── License expiry (kill switch for --video-mode url builds) ────────── */
+  const videoExpiry = "{{VIDEO_EXPIRY}}"; // ISO string, or "" if not gated
+  const licenseMessage = {{LICENSE_MESSAGE_JSON}};
+  let licenseExpired = false;
+
+  function isExpired() {
+    if (!videoExpiry) return false;
+    const exp = new Date(videoExpiry);
+    return !isNaN(exp.getTime()) && Date.now() >= exp.getTime();
+  }
+
+  function showLicenseExpired() {
+    if (licenseExpired) return; // idempotent — the timestamp check and the
+                                 // video error event can both fire
+    licenseExpired = true;
+    document.getElementById("video-container").classList.add("hidden");
+    document.getElementById("license-expired-message").textContent = licenseMessage;
+    document.getElementById("license-expired-panel").classList.remove("hidden");
+  }
+
+  /* ── SCORM tracking ──────────────────────────────────────── */
+  let scormCompleted = false;
+  let lastSavedSec = -1;
+  const SAVE_EVERY_SEC = 10;
+
+  function scormInit() {
+    if (!ScormShim.init()) return;
+    const status = ScormShim.getStatus();
+    if (status === 'completed' || status === 'passed') {
+      scormCompleted = true;
+    } else {
+      ScormShim.setIncomplete();
+      ScormShim.commit();
     }
   }
 
+  function scormSavePos(sec) {
+    if (!ScormShim.isActive() || scormCompleted || licenseExpired) return;
+    const floored = Math.floor(sec);
+    if (floored - lastSavedSec < SAVE_EVERY_SEC) return;
+    lastSavedSec = floored;
+    ScormShim.setSuspendData(JSON.stringify({ v: 1, pos: floored }));
+    ScormShim.commit();
+  }
+
+  function scormLoadPos() {
+    if (!ScormShim.isActive()) return 0;
+    try {
+      const raw = ScormShim.getSuspendData();
+      if (!raw) return 0;
+      const d = JSON.parse(raw);
+      return (d.v === 1 && d.pos > 0) ? d.pos : 0;
+    } catch (e) { return 0; }
+  }
+
+  function scormComplete() {
+    if (!ScormShim.isActive() || scormCompleted || licenseExpired) return;
+    scormCompleted = true;
+    ScormShim.setSuspendData('');
+    ScormShim.setCompleted();
+    ScormShim.commit();
+  }
+
+  scormInit();
+
+  if (isExpired()) {
+    showLicenseExpired();
+  } else {
+    setUpPlayer();
+  }
+
+  function setUpPlayer() {
   if (videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be") || videoType === "youtube") {
     isYouTube = true;
     const videoId = videoUrl.split("v=")[1] || videoUrl.split("/").pop();
     const iframe = document.createElement("iframe");
     iframe.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1`;
     iframe.id = "youtube-player";
-    iframe.allow = "autoplay; encrypted-media";
-    iframe.allowFullscreen = true;
-    iframe.frameBorder = 0;
-    const container = document.getElementById("video-container");
-    container.innerHTML = "";
-    container.appendChild(iframe);
-  } else if (isLearnWorlds) {
-    const iframe = document.createElement("iframe");
-    iframe.src = videoUrl;
-    iframe.id = "learnworlds-player";
     iframe.allow = "autoplay; encrypted-media";
     iframe.allowFullscreen = true;
     iframe.frameBorder = 0;
@@ -208,12 +282,6 @@
     link.textContent = `${idx + 1}. ${sec.title}`;
     link.addEventListener("click", (e) => {
       e.preventDefault();
-      if (isLearnWorlds) {
-        if (seekWarning) {
-          seekWarning.style.display = "block";
-        }
-        return;
-      }
       if (isYouTube && youtubePlayer) {
         youtubePlayer.seekTo(sec.start_seconds, true);
         youtubePlayer.playVideo();
@@ -238,8 +306,30 @@
   }
 
   if (videoPlayer) {
+    /* Load failure (e.g. a signed URL the LMS blocks outright) — same
+       branded panel as a passed expiry timestamp, and never report
+       completion/progress once shown. */
+    videoPlayer.addEventListener("error", () => showLicenseExpired(), { once: true });
+
+    /* Seek to saved position once the video is seekable. */
+    videoPlayer.addEventListener("canplay", () => {
+      const saved = scormLoadPos();
+      if (saved > 0) videoPlayer.currentTime = saved;
+    }, { once: true });
+
     videoPlayer.addEventListener("timeupdate", () => {
-      highlightTranscript(videoPlayer.currentTime);
+      if (licenseExpired) return;
+      const t = videoPlayer.currentTime;
+      highlightTranscript(t);
+      scormSavePos(t);
+      if (!scormCompleted && videoPlayer.duration &&
+          t / videoPlayer.duration >= 0.8) {
+        scormComplete();
+      }
+    });
+
+    videoPlayer.addEventListener("ended", () => {
+      if (!licenseExpired) scormComplete();
     });
   }
 
@@ -251,17 +341,25 @@
     window.onYouTubeIframeAPIReady = () => {
       youtubePlayer = new YT.Player("youtube-player", {
         events: {
+          onReady: () => {
+            const saved = scormLoadPos();
+            if (saved > 0) youtubePlayer.seekTo(saved, true);
+          },
           onStateChange: () => {
             setInterval(() => {
-              if (youtubePlayer && youtubePlayer.getCurrentTime) {
-                highlightTranscript(youtubePlayer.getCurrentTime());
-              }
+              if (!youtubePlayer || !youtubePlayer.getCurrentTime) return;
+              const t = youtubePlayer.getCurrentTime();
+              highlightTranscript(t);
+              scormSavePos(t);
+              const dur = youtubePlayer.getDuration ? youtubePlayer.getDuration() : 0;
+              if (!scormCompleted && dur && t / dur >= 0.8) scormComplete();
             }, 500);
           }
         }
       });
     };
   }
+  } // end setUpPlayer
 </script>
 </body>
 </html>
