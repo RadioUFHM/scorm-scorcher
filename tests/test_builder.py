@@ -207,3 +207,38 @@ def test_manifest_title_round_trips_through_xml_parser(tmp_path, title, version)
 def test_manifest_identifier_is_valid_xml_id(tmp_path, title):
     root = ET.parse(generate_manifest(title, tmp_path)).getroot()
     assert _NCNAME.match(root.get("identifier"))
+
+
+# --- SCO-type attribute spelling per SCORM version (parsed, not string-matched) ---
+
+ADLCP_NS = {
+    "1.2": "http://www.adlnet.org/xsd/adlcp_rootv1p2",
+    "2004": "http://www.adlnet.org/xsd/adlcp_v1p3",
+}
+EXPECTED_ATTR = {"1.2": "scormtype", "2004": "scormType"}
+
+
+@pytest.mark.parametrize("version", ["1.2", "2004"])
+@pytest.mark.parametrize("include_quiz", [True, False])
+def test_resource_scormtype_attribute_matches_version(tmp_path, version, include_quiz):
+    root = ET.parse(generate_manifest("Lesson", tmp_path, include_quiz=include_quiz, scorm_version=version)).getroot()
+    resources = [el for el in root.iter() if _local(el.tag) == "resource"]
+    assert len(resources) == (2 if include_quiz else 1)
+
+    ns = ADLCP_NS[version]
+    for res in resources:
+        adlcp_attrs = [k.split("}", 1)[1] for k in res.attrib if k.startswith("{" + ns + "}")]
+        assert adlcp_attrs == [EXPECTED_ATTR[version]], adlcp_attrs  # exactly one spelling, the right one
+        assert res.get(f"{{{ns}}}{EXPECTED_ATTR[version]}") == "sco"
+
+
+@pytest.mark.parametrize("version", ["1.2", "2004"])
+def test_no_manifest_mixes_scormtype_spellings(tmp_path, version):
+    root = ET.parse(generate_manifest("Lesson", tmp_path, include_quiz=True, scorm_version=version)).getroot()
+    spellings = {
+        k.split("}", 1)[1]
+        for el in root.iter()
+        for k in el.attrib
+        if k.split("}", 1)[-1].lower() == "scormtype"
+    }
+    assert spellings == {EXPECTED_ATTR[version]}

@@ -137,6 +137,8 @@ _SCORM_1P2 = {
         ("adlcp", "http://www.adlnet.org/xsd/adlcp_rootv1p2", "adlcp_rootv1p2.xsd"),
     ],
     "masteryscore": True,
+    # SCORM 1.2 spells the SCO-type attribute all lowercase.
+    "scormtype_attr": "adlcp:scormtype",
 }
 
 _SCORM_2004 = {
@@ -151,6 +153,8 @@ _SCORM_2004 = {
     # SCORM 2004 has no manifest-level mastery score — pass/fail is the SCO's
     # own cmi.success_status, already set by scorm-shim.js.
     "masteryscore": False,
+    # SCORM 2004 (CAM, adlcp_v1p3) spells it camelCase.
+    "scormtype_attr": "adlcp:scormType",
 }
 
 SCORM_VERSIONS = {"1.2": _SCORM_1P2, "2004": _SCORM_2004}
@@ -215,6 +219,7 @@ def generate_manifest(
     cfg = SCORM_VERSIONS[scorm_version]
 
     identifier = _manifest_identifier(title)
+    sco_attr = cfg["scormtype_attr"]
     title_xml = _xml_text(title)
 
     xmlns_lines = []
@@ -237,7 +242,7 @@ def generate_manifest(
             f'      </item>\n'
         )
         quiz_resources = (
-            f'    <resource identifier="RESQ1" type="webcontent" adlcp:scormtype="sco" href="{QUIZ_HTML_NAME}">\n'
+            f'    <resource identifier="RESQ1" type="webcontent" {sco_attr}="sco" href="{QUIZ_HTML_NAME}">\n'
             f'{_file_lines(QUIZ_FILES)}'
             f'    </resource>\n'
         )
@@ -260,7 +265,7 @@ def generate_manifest(
 {quiz_items}    </organization>
   </organizations>
   <resources>
-    <resource identifier="RES1" type="webcontent" adlcp:scormtype="sco" href="index.html">
+    <resource identifier="RES1" type="webcontent" {sco_attr}="sco" href="index.html">
 {_file_lines(list(PLAYER_FILES) + list(extra_files))}    </resource>
 {quiz_resources}  </resources>
 </manifest>"""
