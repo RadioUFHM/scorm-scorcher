@@ -7,7 +7,14 @@ from pathlib import Path
 
 import click
 
-from .builder import QUIZ_HTML_NAME, QUIZ_JSON_NAME, generate_manifest, generate_player_html, generate_quiz_html
+from .builder import (
+    QUIZ_HTML_NAME,
+    QUIZ_JSON_NAME,
+    generate_manifest,
+    generate_player_html,
+    generate_quiz_html,
+    manifest_extra_files,
+)
 from .quiz_generation import generate_quiz_from_transcript, save_quiz_to_json, save_quiz_to_xlsx
 from .scorm_packager import create_scorm_package
 from .transcript import (
@@ -18,7 +25,7 @@ from .transcript import (
     save_sections,
 )
 from .transcription import transcribe_to_srt
-from .video_processing import process_video
+from .video_processing import embedded_video_name, process_video
 
 
 def _resolve_video_mode(video: str, video_mode: str | None, allow_youtube: bool) -> str:
@@ -49,6 +56,11 @@ def _resolve_video_mode(video: str, video_mode: str | None, allow_youtube: bool)
     return "url" if is_url else "embed"
 
 
+def _embedded_files(video: str, resolved_mode: str) -> list[str]:
+    """Package files beyond the standard ones: the video itself in embed mode."""
+    return [embedded_video_name(video)] if resolved_mode == "embed" else []
+
+
 def _resolve_video_expiry(resolved_mode: str, video_expiry: str | None) -> str | None:
     """A technical kill switch only makes sense for a referenced signed URL
     (video_mode='url') — an embedded MP4 has no way to expire itself. Warn
@@ -63,18 +75,24 @@ def _resolve_video_expiry(resolved_mode: str, video_expiry: str | None) -> str |
     return video_expiry
 
 
-def _package_scorm_versions(title: str, out_dir: Path, scorm: str) -> list[Path]:
+def _package_scorm_versions(
+    title: str, out_dir: Path, scorm: str, extra_files: list[str] | None = None,
+) -> list[Path]:
     """Regenerate imsmanifest.xml for each requested SCORM version and zip
     immediately after each regeneration. Cheap because index.html/quiz.html/
     assets are built once and reused unchanged across every version — only
     the manifest differs."""
     versions = ["1.2", "2004"] if scorm == "both" else [scorm]
     quiz_exists = (out_dir / QUIZ_HTML_NAME).exists()
+    if extra_files is None:  # 'package' alone: keep what 'build' listed, e.g. the video
+        extra_files = manifest_extra_files(out_dir)
     multi = len(versions) > 1
 
     zip_paths = []
     for version in versions:
-        generate_manifest(title, out_dir, include_quiz=quiz_exists, scorm_version=version)
+        generate_manifest(
+            title, out_dir, include_quiz=quiz_exists, scorm_version=version, extra_files=extra_files,
+        )
         suffix = "" if not multi else ("_12" if version == "1.2" else "_2004")
         zip_name = title.replace(" ", "_") + f"_SCORM{suffix}.zip"
         zip_path = out_dir / zip_name
@@ -248,7 +266,10 @@ def build(
             transcript, sections, title, out_dir, video, resolved_mode,
             effective_expiry, license_message,
         )
-        manifest_path = generate_manifest(title, out_dir, include_quiz=quiz_exists, scorm_version=scorm)
+        manifest_path = generate_manifest(
+            title, out_dir, include_quiz=quiz_exists, scorm_version=scorm,
+            extra_files=_embedded_files(video, resolved_mode),
+        )
 
         click.echo(f"Player:     {html_path}")
         click.echo(f"Manifest:   {manifest_path}")
@@ -274,7 +295,7 @@ def package_cmd(input_dir: str, title: str, scorm: str) -> None:
         for zip_path in zip_paths:
             click.echo(f"SCORM package: {zip_path}")
 
-    except (FileNotFoundError, NotADirectoryError) as exc:
+    except (FileNotFoundError, NotADirectoryError, ValueError, RuntimeError) as exc:
         raise click.ClickException(str(exc))
 
 
@@ -422,7 +443,9 @@ def run_pipeline(
 
         # ── 4 / 4  PACKAGE ───────────────────────────────────────────────
         click.echo("\n[4/4] Packaging SCORM zip…")
-        zip_paths = _package_scorm_versions(title, out_dir, scorm)
+        zip_paths = _package_scorm_versions(
+            title, out_dir, scorm, extra_files=_embedded_files(video, resolved_mode),
+        )
 
         click.echo("\n" + "─" * 60)
         for zip_path in zip_paths:

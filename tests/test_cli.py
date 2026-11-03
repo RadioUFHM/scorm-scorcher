@@ -223,3 +223,81 @@ def test_build_missing_srt_fails(tmp_path):
     result = runner.invoke(main, ["build", "--video", "x.mp4", "--input", str(out)])
     assert result.exit_code != 0
     assert "prepare" in result.output.lower() or "srt" in result.output.lower()
+
+
+# --- Package allowlist, end to end through the CLI ---
+
+WORKING_FILES = ["audio.mp3", "audio.md", "segment_000.mp4", ".video_source_url"]
+
+
+def _zip_names(path: Path) -> list:
+    with zipfile.ZipFile(path) as zf:
+        return sorted(zf.namelist())
+
+
+def test_build_then_package_both_ships_video_and_no_working_files(tmp_path):
+    out = _make_prepared_dir(tmp_path)  # holds audio.srt, a working file
+    for name in WORKING_FILES:
+        (out / name).write_text("work", encoding="utf-8")
+    video = tmp_path / "lesson.mp4"
+    video.write_bytes(b"video")
+
+    runner = CliRunner()
+    built = runner.invoke(main, ["build", "--video", str(video), "--input", str(out), "--title", "My Lesson"])
+    assert built.exit_code == 0, built.output
+    result = runner.invoke(main, ["package", "--input", str(out), "--title", "My Lesson", "--scorm", "both"])
+    assert result.exit_code == 0, result.output
+
+    for zip_name in ("My_Lesson_SCORM_12.zip", "My_Lesson_SCORM_2004.zip"):
+        names = _zip_names(out / zip_name)
+        assert names == sorted(["imsmanifest.xml", "index.html", "branding.css", "scorm-shim.js", "lesson.mp4"])
+
+
+def test_url_mode_package_has_no_video_file(tmp_path):
+    out = _make_prepared_dir(tmp_path)
+    runner = CliRunner()
+    built = runner.invoke(main, [
+        "build", "--video", "https://cdn.example.com/lesson.mp4", "--video-mode", "url",
+        "--input", str(out), "--title", "Url Lesson",
+    ])
+    assert built.exit_code == 0, built.output
+    result = runner.invoke(main, ["package", "--input", str(out), "--title", "Url Lesson"])
+    assert result.exit_code == 0, result.output
+    assert not any(n.endswith(".mp4") for n in _zip_names(out / "Url_Lesson_SCORM.zip"))
+
+
+def test_package_reports_missing_listed_file(tmp_path):
+    out = _make_prepared_dir(tmp_path)
+    video = tmp_path / "lesson.mp4"
+    video.write_bytes(b"video")
+    runner = CliRunner()
+    runner.invoke(main, ["build", "--video", str(video), "--input", str(out), "--title", "My Lesson"])
+    (out / "lesson.mp4").unlink()
+    result = runner.invoke(main, ["package", "--input", str(out), "--title", "My Lesson"])
+    assert result.exit_code != 0
+    assert "lesson.mp4" in result.output
+
+
+def test_run_auto_ships_video_and_no_working_files(tmp_path):
+    out = tmp_path / "run_out"
+    video = tmp_path / "lesson.mp4"
+    video.write_bytes(b"video")
+    srt = tmp_path / "lesson.srt"
+    srt.write_text(SRT, encoding="utf-8")
+
+    def fake_process_video(video_source, work_dir, **kwargs):
+        Path(work_dir).mkdir(parents=True, exist_ok=True)
+        audio = Path(work_dir) / "audio.mp3"
+        audio.write_text("audio", encoding="utf-8")
+        return {"audio": str(audio), "subtitles": None, "segments": []}
+
+    with patch("scorm_scorcher.cli.process_video", side_effect=fake_process_video):
+        result = CliRunner().invoke(main, [
+            "run", "--video", str(video), "--output", str(out), "--title", "Run Lesson",
+            "--subtitles", str(srt), "--no-segment", "--auto",
+        ])
+    assert result.exit_code == 0, result.output
+    names = _zip_names(out / "Run_Lesson_SCORM.zip")
+    assert "lesson.mp4" in names
+    assert "audio.mp3" not in names
+    assert not any(n.endswith((".srt", ".md", ".sections")) for n in names)

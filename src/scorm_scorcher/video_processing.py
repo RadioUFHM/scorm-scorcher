@@ -33,6 +33,17 @@ def _download_video(url: str, dest: Path) -> None:
 SOURCE_URL_MARKER = ".video_source_url"
 
 
+def embedded_video_name(video_src: str) -> str:
+    """Filename the video has inside the package in embed mode.
+
+    A local file keeps its own name; a downloaded URL is saved as
+    _source<ext> (see download_for_embed).
+    """
+    if _is_url(video_src):
+        return f"_source{Path(video_src.split('?')[0]).suffix or '.mp4'}"
+    return Path(video_src).name
+
+
 def download_for_embed(url: str, dest_dir: Path) -> Path:
     """Download url into dest_dir, or reuse an existing cached copy if the
     same url was already downloaded there.
@@ -45,8 +56,7 @@ def download_for_embed(url: str, dest_dir: Path) -> Path:
     dest_dir = Path(dest_dir)
     dest_dir.mkdir(parents=True, exist_ok=True)
     marker = dest_dir / SOURCE_URL_MARKER
-    suffix = Path(url.split("?")[0]).suffix or ".mp4"
-    local_copy = dest_dir / f"_source{suffix}"
+    local_copy = dest_dir / embedded_video_name(url)
 
     if (
         local_copy.exists()

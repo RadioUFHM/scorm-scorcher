@@ -6,10 +6,11 @@ import json
 import re
 import shutil
 from pathlib import Path
-from typing import List
+from typing import List, Sequence
 from xml.sax.saxutils import escape as _xml_escape
 
-from .video_processing import download_for_embed
+from .scorm_packager import MANIFEST_NAME, manifest_files
+from .video_processing import download_for_embed, embedded_video_name
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 QUIZ_HTML_NAME = "quiz.html"
@@ -18,6 +19,11 @@ BRANDING_NAME = "branding.css"
 SCORM_SHIM_NAME = "scorm-shim.js"
 
 VIDEO_MODES = ("embed", "url", "youtube")
+
+# Files each SCO needs, as listed in imsmanifest.xml. The packager zips exactly
+# what the manifest lists, so these lists are the package allowlist.
+PLAYER_FILES = ("index.html", BRANDING_NAME, SCORM_SHIM_NAME)
+QUIZ_FILES = (QUIZ_HTML_NAME, QUIZ_JSON_NAME, BRANDING_NAME, SCORM_SHIM_NAME)
 
 DEFAULT_LICENSE_MESSAGE = (
     "This training license has expired. Please contact FCI Tradecraft to renew access."
@@ -61,7 +67,7 @@ def generate_player_html(
             local_path = download_for_embed(video_src, output_dir)
         else:
             video_path = Path(video_src)
-            dest = output_dir / video_path.name
+            dest = output_dir / embedded_video_name(video_src)
             if video_path.resolve() != dest.resolve():
                 shutil.copy(video_path, dest)
             local_path = dest
@@ -170,13 +176,32 @@ def _manifest_identifier(title: str) -> str:
     return ident
 
 
+def _file_lines(names: Sequence[str]) -> str:
+    return "".join(f'      <file href="{_xml_text(name)}" />\n' for name in names)
+
+
+def manifest_extra_files(output_dir: Path) -> List[str]:
+    """Files an existing manifest lists beyond the standard player and quiz
+    files (e.g. the embedded video), so a regenerated manifest keeps them."""
+    path = output_dir / MANIFEST_NAME
+    if not path.is_file():
+        return []
+    standard = set(PLAYER_FILES) | set(QUIZ_FILES)
+    return [name for name in manifest_files(path) if name not in standard]
+
+
 def generate_manifest(
     title: str,
     output_dir: Path,
     include_quiz: bool = False,
     scorm_version: str = "1.2",
+    extra_files: Sequence[str] = (),
 ) -> Path:
     """Write an imsmanifest.xml SCORM manifest (1.2 or 2004) into output_dir.
+
+    extra_files are added to the lesson resource, e.g. the video in embed mode.
+    Every file the package will contain is listed here; the packager zips
+    nothing else.
 
     The <organizations>/<resources> skeleton is identical between versions;
     only the namespace/schema header, <schemaversion>, and presence of
@@ -213,10 +238,7 @@ def generate_manifest(
         )
         quiz_resources = (
             f'    <resource identifier="RESQ1" type="webcontent" adlcp:scormtype="sco" href="{QUIZ_HTML_NAME}">\n'
-            f'      <file href="{QUIZ_HTML_NAME}" />\n'
-            f'      <file href="{QUIZ_JSON_NAME}" />\n'
-            f'      <file href="{BRANDING_NAME}" />\n'
-            f'      <file href="{SCORM_SHIM_NAME}" />\n'
+            f'{_file_lines(QUIZ_FILES)}'
             f'    </resource>\n'
         )
 
@@ -239,10 +261,7 @@ def generate_manifest(
   </organizations>
   <resources>
     <resource identifier="RES1" type="webcontent" adlcp:scormtype="sco" href="index.html">
-      <file href="index.html" />
-      <file href="{BRANDING_NAME}" />
-      <file href="{SCORM_SHIM_NAME}" />
-    </resource>
+{_file_lines(list(PLAYER_FILES) + list(extra_files))}    </resource>
 {quiz_resources}  </resources>
 </manifest>"""
 
