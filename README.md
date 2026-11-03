@@ -55,8 +55,19 @@ scorm-scorcher package --input ./build --title "My Lesson"
   otherwise a built-in word-blanking fallback that needs no API key at all.
   Add `--xlsx` to also export the quiz as a spreadsheet.
 - **build** — renders the HTML video player and quiz page and writes
-  `imsmanifest.xml`.
-- **package** — zips everything into a SCORM-compliant `.zip`.
+  `imsmanifest.xml`. The quiz questions are copied from `quiz.json` into
+  `quiz.html` at this step.
+- **package** — zips `imsmanifest.xml` and exactly the files it lists into a
+  SCORM `.zip`. Working files in the folder (`audio.mp3`, `.srt`,
+  `transcript.md`, `.sections`, video segments) are never packaged. If a
+  listed file is missing, packaging stops and names it.
+
+### Editing the quiz
+
+Edit `quiz.json` in the build folder after `quiz`, then run `build` again
+before `package`. `package` alone does not re-read `quiz.json`, so edits made
+after the last `build` won't reach the learner. `run` (without `--auto`)
+pauses so you can edit the quiz, and rebuilds from your edited file.
 
 ## Video source options
 
@@ -84,6 +95,18 @@ scorm-scorcher package --input ./build --title "My Lesson"
 When a learner scores 80% or higher on the quiz, a "View / Print Certificate"
 button appears on the results screen. It renders and prints (or saves as PDF)
 entirely in the browser — no server involved.
+
+## Quiz answer key
+
+The quiz is graded in the learner's browser, so the correct answers ship
+inside the package: in `quiz.html`, and in `quiz.json`, which the page does
+not read. A learner who opens the page source can find them. SCORM has no
+server-side grading, so this is true of browser-graded SCORM quizzes in
+general.
+
+Treat the quiz as a completion and comprehension check, not a secure exam.
+Each answer, and the correct response, is also sent to the LMS through
+`cmi.interactions`, so an administrator can review attempts there.
 
 ## Testing
 
