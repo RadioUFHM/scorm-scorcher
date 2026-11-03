@@ -2,6 +2,7 @@
 
 import json
 import re
+from html.parser import HTMLParser
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import patch
@@ -242,3 +243,66 @@ def test_no_manifest_mixes_scormtype_spellings(tmp_path, version):
         if k.split("}", 1)[-1].lower() == "scormtype"
     }
     assert spellings == {EXPECTED_ATTR[version]}
+
+
+# --- Title in the HTML pages and the quiz script (parsed, not string-matched) ---
+
+PAGE_TITLES = SPECIAL_TITLES + ["Ends the script </script><b>x</b>", "Back\\slash \\n title"]
+
+
+class _PageReader(HTMLParser):
+    """Collects <title> text, <h1> text and <script> contents."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.title, self.h1, self.scripts, self._in = "", [], [], None
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("title", "h1", "script"):
+            self._in = tag
+            if tag == "h1":
+                self.h1.append("")
+            if tag == "script":
+                self.scripts.append("")
+
+    def handle_endtag(self, tag):
+        if tag == self._in:
+            self._in = None
+
+    def handle_data(self, data):
+        if self._in == "title":
+            self.title += data
+        elif self._in == "h1":
+            self.h1[-1] += data
+        elif self._in == "script":
+            self.scripts[-1] += data
+
+
+def _read_page(path: Path) -> _PageReader:
+    reader = _PageReader()
+    reader.feed(path.read_text(encoding="utf-8"))
+    return reader
+
+
+@pytest.mark.parametrize("title", PAGE_TITLES)
+def test_player_page_shows_title_exactly(tmp_path, title):
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"")
+    page = _read_page(generate_player_html(TRANSCRIPT, SECTIONS, title, tmp_path, str(video), video_mode="embed"))
+    assert page.title == title
+    assert page.h1 == [title]
+
+
+@pytest.mark.parametrize("title", PAGE_TITLES)
+def test_quiz_page_and_certificate_title_round_trip(tmp_path, title):
+    (tmp_path / QUIZ_JSON_NAME).write_text('{"questions": []}', encoding="utf-8")
+    page = _read_page(generate_quiz_html(tmp_path, title))
+    assert page.title == f"{title} — Quiz"
+    assert title in page.h1
+
+    # The certificate's courseTitle must be one valid JS string literal inside
+    # the script block. A JSON string literal is a valid JS string literal.
+    script = "".join(page.scripts)
+    match = re.search(r'courseTitle:\s*("(?:[^"\\]|\\.)*")\s*,', script)
+    assert match, "courseTitle not found inside a <script> block"
+    assert json.loads(match.group(1)) == title

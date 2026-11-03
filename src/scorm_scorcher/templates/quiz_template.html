@@ -358,7 +358,7 @@
       if (passed) {
         renderCertificate({
           learnerName: formatLearnerName(ScormShim.getLearnerName()),
-          courseTitle: "{{TITLE}}",
+          courseTitle: {{TITLE_JSON}},
           scorePercent: percent,
           dateStr: new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
         });

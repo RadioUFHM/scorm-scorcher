@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import json
 import re
 import shutil
@@ -24,6 +25,25 @@ VIDEO_MODES = ("embed", "url", "youtube")
 # what the manifest lists, so these lists are the package allowlist.
 PLAYER_FILES = ("index.html", BRANDING_NAME, SCORM_SHIM_NAME)
 QUIZ_FILES = (QUIZ_HTML_NAME, QUIZ_JSON_NAME, BRANDING_NAME, SCORM_SHIM_NAME)
+
+def _html_text(value: str) -> str:
+    """Escape a user-supplied value for HTML text or a quoted attribute."""
+    return html.escape(value, quote=True)
+
+
+def _js_string(value: str) -> str:
+    """Encode a value as a JavaScript string literal that is safe inside <script>.
+
+    json.dumps handles quotes and backslashes; '<', '>' and '&' are also
+    encoded so a value containing '</script>' cannot end the script block.
+    """
+    return (
+        json.dumps(value)
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+    )
+
 
 DEFAULT_LICENSE_MESSAGE = (
     "This training license has expired. Please contact FCI Tradecraft to renew access."
@@ -83,7 +103,7 @@ def generate_player_html(
         template
         .replace("{{TRANSCRIPT_JSON}}", json.dumps(transcript))
         .replace("{{SECTIONS_JSON}}", json.dumps(sections))
-        .replace("{{TITLE}}", title)
+        .replace("{{TITLE}}", _html_text(title))
         .replace("{{VIDEO}}", video_value)
         .replace("{{VIDEO_TYPE}}", video_type)
         .replace("{{VIDEO_EXPIRY}}", expiry_value)
@@ -118,7 +138,8 @@ def generate_quiz_html(
 
     html = (
         template
-        .replace("{{TITLE}}", title)
+        .replace("{{TITLE_JSON}}", _js_string(title))
+        .replace("{{TITLE}}", _html_text(title))
         .replace("{{QUIZ_DATA}}", quiz_data)
         .replace("{{VIDEO_EXPIRY}}", video_expiry or "")
         .replace("{{LICENSE_MESSAGE_JSON}}", json.dumps(license_message or DEFAULT_LICENSE_MESSAGE))
@@ -182,6 +203,15 @@ def _manifest_identifier(title: str) -> str:
 
 def _file_lines(names: Sequence[str]) -> str:
     return "".join(f'      <file href="{_xml_text(name)}" />\n' for name in names)
+
+
+def package_basename(title: str) -> str:
+    """Zip filename stem for a title: letters, digits, '-' and '_' only.
+
+    "AML & Sanctions" -> "AML_Sanctions". The title shown inside the course
+    is unchanged; only the filename is simplified.
+    """
+    return re.sub(r"[^A-Za-z0-9_-]+", "_", title).strip("_") or "SCORM_Lesson"
 
 
 def manifest_extra_files(output_dir: Path) -> List[str]:

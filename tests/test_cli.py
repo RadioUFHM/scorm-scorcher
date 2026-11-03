@@ -301,3 +301,23 @@ def test_run_auto_ships_video_and_no_working_files(tmp_path):
     assert "lesson.mp4" in names
     assert "audio.mp3" not in names
     assert not any(n.endswith((".srt", ".md", ".sections")) for n in names)
+
+
+# --- Zip filename from the title ---
+
+@pytest.mark.parametrize("title, zip_name", [
+    ("AML & Sanctions", "AML_Sanctions_SCORM.zip"),
+    ("KYC: Part 1/2", "KYC_Part_1_2_SCORM.zip"),
+    ("My Lesson", "My_Lesson_SCORM.zip"),
+    ("&&&", "SCORM_Lesson_SCORM.zip"),
+])
+def test_zip_filename_is_safe_for_title(tmp_path, title, zip_name):
+    out = _make_prepared_dir(tmp_path)
+    video = tmp_path / "lesson.mp4"
+    video.write_bytes(b"video")
+    runner = CliRunner()
+    built = runner.invoke(main, ["build", "--video", str(video), "--input", str(out), "--title", title])
+    assert built.exit_code == 0, built.output
+    result = runner.invoke(main, ["package", "--input", str(out), "--title", title])
+    assert result.exit_code == 0, result.output
+    assert sorted(p.name for p in out.glob("*.zip")) == [zip_name]

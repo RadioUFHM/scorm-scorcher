@@ -14,6 +14,7 @@ from .builder import (
     generate_player_html,
     generate_quiz_html,
     manifest_extra_files,
+    package_basename,
 )
 from .quiz_generation import generate_quiz_from_transcript, save_quiz_to_json, save_quiz_to_xlsx
 from .scorm_packager import create_scorm_package
@@ -94,7 +95,7 @@ def _package_scorm_versions(
             title, out_dir, include_quiz=quiz_exists, scorm_version=version, extra_files=extra_files,
         )
         suffix = "" if not multi else ("_12" if version == "1.2" else "_2004")
-        zip_name = title.replace(" ", "_") + f"_SCORM{suffix}.zip"
+        zip_name = package_basename(title) + f"_SCORM{suffix}.zip"
         zip_path = out_dir / zip_name
         create_scorm_package(str(out_dir), str(zip_path))
         zip_paths.append(zip_path)
