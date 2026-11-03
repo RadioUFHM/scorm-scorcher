@@ -1,6 +1,12 @@
+.DS_Store
 __pycache__/
 *.py[cod]
-*.zip
-*.srt
-.env
-.vscode/
+*.egg-info/
+venv/
+.venv/
+dist/
+build/
+output/
+output_folder/
+_legacy_backup_2026-03-31/
+FCX2 Sort_Filter_Color/

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SCORM Lesson</title>
+    <link rel="stylesheet" href="templates/branding.css" />
+    <script>
+        let transcriptTimestamps = [];
+
+        function initTranscriptSync() {
+            const rows = document.querySelectorAll("#transcript-table tbody tr");
+            transcriptTimestamps = Array.from(rows).map(row => {
+                return {
+                    time: parseTime(row.dataset.start),
+                    row: row
+                };
+            });
+
+            const video = document.getElementById("lesson-video");
+            video.addEventListener("timeupdate", () => {
+                const currentTime = video.currentTime;
+                let activeRow = null;
+
+                for (let i = 0; i < transcriptTimestamps.length; i++) {
+                    const ts = transcriptTimestamps[i];
+                    if (currentTime >= ts.time) {
+                        activeRow = ts.row;
+                    }
+                }
+
+                if (activeRow) {
+                    highlightRow(activeRow);
+                    if (document.getElementById("autoscroll").checked) {
+                        scrollToRow(activeRow);
+                    }
+                }
+            });
+        }
+
+        function parseTime(timeStr) {
+            const [h, m, s] = timeStr.split(":");
+            return parseInt(h) * 3600 + parseInt(m) * 60 + parseFloat(s.replace(",", "."));
+        }
+
+        function highlightRow(row) {
+            document.querySelectorAll("#transcript-table tbody tr").forEach(r => r.classList.remove("active"));
+            row.classList.add("active");
+        }
+
+        function scrollToRow(row) {
+            const container = document.querySelector("#transcript-table tbody");
+            const containerRect = container.getBoundingClientRect();
+            const rowRect = row.getBoundingClientRect();
+            const offset = rowRect.top - containerRect.top - containerRect.height / 2;
+            container.scrollTop += offset;
+        }
+
+        function searchTranscript() {
+            const input = document.getElementById("searchBox").value.toLowerCase();
+            const rows = document.querySelectorAll("#transcript-table tbody tr");
+            rows.forEach(row => {
+                row.style.display = row.innerText.toLowerCase().includes(input) ? "" : "none";
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", initTranscriptSync);
+    </script>
+</head>
+<body>
+    <div id="sidebar-container"></div>
+    <main>
+        <h1 id="lesson-title">Section Title</h1>
+        <video id="lesson-video" width="100%" controls>
+            <source src="" type="video/mp4" />
+            Your browser does not support video.
+        </video>
+        <div style="margin-top: 10px; display: flex; align-items: center;">
+            <input type="checkbox" id="autoscroll">
+            <label for="autoscroll" style="margin-left: 6px;">Auto-scroll transcript</label>
+        </div>
+        <input type="text" id="searchBox" placeholder="Search transcript..." onkeyup="searchTranscript()">
+        <div id="transcript-container" style="max-height: 400px; overflow-y: auto; margin-top: 10px;">
+            <table id="transcript-table">
+                <thead>
+                    <tr>
+                        <th>Start</th>
+                        <th>Transcript</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div id="nav-buttons" class="nav-buttons"></div>
+    </main>
+</body>
+</html>

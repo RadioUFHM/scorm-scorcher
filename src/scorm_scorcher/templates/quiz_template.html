@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{TITLE}} — Quiz</title>
+  <link rel="stylesheet" href="branding.css" />
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 20px 20px 48px;
+      background: #fafafa;
+      color: #333;
+    }
+
+    h1 { color: #0d1b2a; margin-bottom: 24px; font-size: 1.4rem; }
+
+    .hidden { display: none !important; }
+
+    /* ── Progress ─────────────────────────────────────────── */
+    .progress-label { font-size: 0.85rem; color: #666; margin-bottom: 6px; }
+    .progress-track {
+      height: 6px;
+      background: #e0e0e0;
+      border-radius: 3px;
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #0077cc;
+      border-radius: 3px;
+      transition: width 0.35s ease;
+    }
+
+    /* ── Question ─────────────────────────────────────────── */
+    .question-text {
+      font-size: 1.05rem;
+      line-height: 1.55;
+      margin: 0 0 20px;
+    }
+
+    /* ── Options ──────────────────────────────────────────── */
+    .options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+
+    .option {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 16px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      line-height: 1.4;
+    }
+    .option:hover { border-color: #0077cc; background: #f0f7ff; }
+    .option input[type="radio"] {
+      flex-shrink: 0;
+      margin-top: 2px;
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: #0077cc;
+    }
+
+    .option.correct  { border-color: #2e7d32; background: #e8f5e9; }
+    .option.incorrect { border-color: #c62828; background: #ffebee; }
+    .option.correct  span { color: #1b5e20; font-weight: bold; }
+    .option.incorrect span { color: #b71c1c; }
+
+    /* ── Feedback ─────────────────────────────────────────── */
+    .feedback {
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      border-left: 4px solid transparent;
+    }
+    .feedback.correct-fb   { background: #e8f5e9; border-left-color: #2e7d32; }
+    .feedback.incorrect-fb { background: #ffebee; border-left-color: #c62828; }
+
+    .feedback-header { font-weight: bold; margin-bottom: 6px; }
+    .feedback-header.correct   { color: #1b5e20; }
+    .feedback-header.incorrect { color: #b71c1c; }
+
+    .explanation { margin: 0; font-size: 0.92rem; color: #444; line-height: 1.5; }
+
+    /* ── Buttons ──────────────────────────────────────────── */
+    .btn-row { display: flex; gap: 12px; flex-wrap: wrap; }
+
+    button {
+      padding: 10px 22px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: bold;
+      transition: background 0.15s;
+    }
+    #submit-btn          { background: #0077cc; color: #fff; }
+    #submit-btn:hover    { background: #005fa3; }
+    #next-btn            { background: #0d1b2a; color: #fff; }
+    #next-btn:hover      { background: #1a3050; }
+    .retry-btn           { background: #0077cc; color: #fff; margin-top: 28px; }
+    .retry-btn:hover     { background: #005fa3; }
+
+    /* ── Score display ────────────────────────────────────── */
+    .score-display {
+      text-align: center;
+      padding: 32px 20px;
+      border-radius: 12px;
+      margin-bottom: 28px;
+      border: 2px solid transparent;
+    }
+    .score-display.passed { background: #e8f5e9; border-color: #2e7d32; }
+    .score-display.failed { background: #ffebee; border-color: #c62828; }
+
+    .score-number { font-size: 3.2rem; font-weight: bold; line-height: 1; }
+    .score-display.passed .score-number { color: #1b5e20; }
+    .score-display.failed .score-number { color: #b71c1c; }
+
+    .score-label { font-size: 1.15rem; font-weight: bold; margin: 10px 0 4px; }
+    .score-display.passed .score-label { color: #2e7d32; }
+    .score-display.failed .score-label { color: #c62828; }
+
+    .score-sub { font-size: 0.9rem; color: #666; }
+
+    .all-correct { color: #2e7d32; font-weight: bold; font-size: 1rem; margin: 0 0 8px; }
+
+    /* ── Review list ──────────────────────────────────────── */
+    .review-heading { font-size: 1rem; color: #0d1b2a; margin: 0 0 14px; }
+    .review-list    { display: flex; flex-direction: column; gap: 12px; }
+
+    .review-item {
+      padding: 14px 16px;
+      border-radius: 8px;
+      border-left: 4px solid #c62828;
+      background: #ffebee;
+      font-size: 0.9rem;
+    }
+    .review-num      { font-weight: bold; color: #c62828; margin-bottom: 6px; }
+    .review-question { margin: 0 0 8px; font-weight: bold; color: #222; }
+    .review-answer   { margin: 2px 0; }
+    .review-expl     { margin: 8px 0 0; color: #555; font-style: italic; line-height: 1.45; }
+
+    /* ── License expired ─────────────────────────────────────── */
+    #license-expired-panel {
+      padding: 32px 28px;
+      background: #f7f7f7;
+      border: 2px solid #0d1b2a;
+      border-radius: 8px;
+      text-align: center;
+    }
+    #license-expired-panel h2 { margin: 0 0 10px; color: #0d1b2a; }
+    #license-expired-panel p  { margin: 0; color: #333; }
+  </style>
+  <script src="scorm-shim.js"></script>
+  <script>
+    var quizData = ({{QUIZ_DATA}}.questions || []);
+    var current  = 0;
+    var score    = 0;
+    var results  = [];
+
+    /* ── License expiry (mirrors the player — refuses to certify once the
+       paired video's license has lapsed, so a learner can't bypass an
+       expired video and still pass) ────────────────────────────────── */
+    var videoExpiry = "{{VIDEO_EXPIRY}}";
+    var licenseMessage = {{LICENSE_MESSAGE_JSON}};
+
+    function isExpired() {
+      if (!videoExpiry) return false;
+      var exp = new Date(videoExpiry);
+      return !isNaN(exp.getTime()) && Date.now() >= exp.getTime();
+    }
+
+    function showLicenseExpired() {
+      document.getElementById('question-view').classList.add('hidden');
+      document.getElementById('results-view').classList.add('hidden');
+      document.getElementById('license-expired-message').textContent = licenseMessage;
+      document.getElementById('license-expired-panel').classList.remove('hidden');
+    }
+
+    /* ── SCORM ──────────────────────────────────────────────── */
+    function initScorm() {
+      ScormShim.init();
+    }
+
+    /* Save partial progress so the learner can resume mid-quiz. */
+    function saveProgress() {
+      if (!ScormShim.isActive()) return;
+      var compact = results.map(function (r) {
+        return { u: r.userAnswer, c: r.correctAnswer, ok: r.isCorrect };
+      });
+      var state = JSON.stringify({
+        v: 1, total: quizData.length, current: current, score: score, r: compact
+      });
+      if (state.length <= 4096) {
+        ScormShim.setSuspendData(state);
+        ScormShim.setIncomplete();
+        ScormShim.commit();
+      }
+    }
+
+    /* Restore progress from a previous session. Returns true if state was loaded. */
+    function loadProgress() {
+      if (!ScormShim.isActive()) return false;
+      try {
+        var raw = ScormShim.getSuspendData();
+        if (!raw) return false;
+        var saved = JSON.parse(raw);
+        if (saved.v !== 1 || saved.total !== quizData.length || !saved.r) return false;
+        current = saved.current || 0;
+        score   = saved.score   || 0;
+        /* Reconstruct full result objects from compact form + quizData. */
+        results = saved.r.map(function (r, i) {
+          var q = quizData[i];
+          return {
+            prompt:        q.prompt,
+            userAnswer:    r.u,
+            correctAnswer: r.c,
+            isCorrect:     r.ok,
+            explanation:   q.explanation || ''
+          };
+        });
+        return results.length > 0;
+      } catch (e) { return false; }
+    }
+
+    function recordInteraction(idx, userAnswer, correctAnswer, isCorrect) {
+      ScormShim.recordInteraction(idx, 'Q' + (idx + 1), userAnswer, correctAnswer, isCorrect);
+    }
+
+    /* ── Helpers ────────────────────────────────────────────── */
+    function esc(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function correctStr(q) {
+      if (q.type === 'true_false') {
+        return (q.answer === true || q.answer === 'True') ? 'True' : 'False';
+      }
+      return String(q.answer);
+    }
+
+    /* ── Render question ────────────────────────────────────── */
+    function showQuestion() {
+      var q    = quizData[current];
+      var opts = (q.type === 'true_false') ? ['True', 'False'] : (q.options || []);
+      var pct  = Math.round((current / quizData.length) * 100);
+
+      var optionsHtml = opts.map(function (opt, i) {
+        return '<label class="option" id="opt-' + i + '">' +
+          '<input type="radio" name="answer" value="' + esc(opt) + '">' +
+          '<span>' + esc(opt) + '</span>' +
+          '</label>';
+      }).join('');
+
+      document.getElementById('question-view').innerHTML =
+        '<div class="progress-label">Question ' + (current + 1) + ' of ' + quizData.length + '</div>' +
+        '<div class="progress-track">' +
+          '<div class="progress-fill" style="width:' + pct + '%"></div>' +
+        '</div>' +
+        '<p class="question-text">' + esc(q.prompt) + '</p>' +
+        '<div class="options">' + optionsHtml + '</div>' +
+        '<div id="feedback" class="hidden"></div>' +
+        '<div class="btn-row">' +
+          '<button id="submit-btn" onclick="submitAnswer()">Submit Answer</button>' +
+          '<button id="next-btn" class="hidden" onclick="nextQuestion()">' +
+            (current + 1 < quizData.length ? 'Next Question' : 'See Results') +
+          '</button>' +
+        '</div>';
+
+      document.getElementById('question-view').classList.remove('hidden');
+      document.getElementById('results-view').classList.add('hidden');
+    }
+
+    /* ── Submit ─────────────────────────────────────────────── */
+    function submitAnswer() {
+      var q        = quizData[current];
+      var selected = document.querySelector('input[name="answer"]:checked');
+      if (!selected) { alert('Please select an answer.'); return; }
+
+      var userAnswer    = selected.value;
+      var correctAnswer = correctStr(q);
+      var isCorrect     = (userAnswer === correctAnswer);
+
+      if (isCorrect) score++;
+      results.push({
+        prompt:        q.prompt,
+        userAnswer:    userAnswer,
+        correctAnswer: correctAnswer,
+        isCorrect:     isCorrect,
+        explanation:   q.explanation || ''
+      });
+
+      recordInteraction(current, userAnswer, correctAnswer, isCorrect);
+
+      /* Lock all radio buttons */
+      document.querySelectorAll('input[name="answer"]').forEach(function (r) {
+        r.disabled = true;
+      });
+
+      /* Colour options */
+      document.querySelectorAll('.option').forEach(function (label) {
+        var val = label.querySelector('input').value;
+        if (val === correctAnswer)              label.classList.add('correct');
+        else if (val === userAnswer && !isCorrect) label.classList.add('incorrect');
+      });
+
+      /* Feedback box */
+      var fb = document.getElementById('feedback');
+      fb.className = 'feedback ' + (isCorrect ? 'correct-fb' : 'incorrect-fb');
+      fb.innerHTML =
+        '<div class="feedback-header ' + (isCorrect ? 'correct' : 'incorrect') + '">' +
+          (isCorrect
+            ? '&#10003; Correct!'
+            : '&#10007; Incorrect — the correct answer is: <em>' + esc(correctAnswer) + '</em>') +
+        '</div>' +
+        (q.explanation
+          ? '<p class="explanation">' + esc(q.explanation) + '</p>'
+          : '');
+
+      saveProgress();
+      document.getElementById('submit-btn').classList.add('hidden');
+      document.getElementById('next-btn').classList.remove('hidden');
+    }
+
+    /* ── Next ───────────────────────────────────────────────── */
+    function nextQuestion() {
+      current++;
+      if (current < quizData.length) {
+        showQuestion();
+      } else {
+        showResults();
+      }
+    }
+
+    /* ── Results ────────────────────────────────────────────── */
+    function showResults() {
+      var percent = Math.round((score / quizData.length) * 100);
+      var passed  = percent >= 80;
+
+      if (ScormShim.isActive()) {
+        ScormShim.setSuspendData('');   /* clear resume state on completion */
+        ScormShim.setResult(passed, percent);
+        ScormShim.commit();
+        ScormShim.terminate();
+      }
+
+      if (passed) {
+        renderCertificate({
+          learnerName: formatLearnerName(ScormShim.getLearnerName()),
+          courseTitle: "{{TITLE}}",
+          scorePercent: percent,
+          dateStr: new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+        });
+      }
+
+      /* Build review section — incorrect items only */
+      var reviewHtml = '';
+      var anyWrong   = results.some(function (r) { return !r.isCorrect; });
+
+      if (!anyWrong) {
+        reviewHtml = '<p class="all-correct">&#10003; You got every question right!</p>';
+      } else {
+        var items = '';
+        results.forEach(function (r, i) {
+          if (r.isCorrect) return;
+          items +=
+            '<div class="review-item">' +
+              '<div class="review-num">&#10007; Question ' + (i + 1) + '</div>' +
+              '<p class="review-question">' + esc(r.prompt) + '</p>' +
+              '<p class="review-answer"><strong>Your answer:</strong> ' + esc(r.userAnswer) + '</p>' +
+              '<p class="review-answer"><strong>Correct answer:</strong> ' + esc(r.correctAnswer) + '</p>' +
+              (r.explanation
+                ? '<p class="review-expl">' + esc(r.explanation) + '</p>'
+                : '') +
+            '</div>';
+        });
+        reviewHtml =
+          '<h3 class="review-heading">Review your incorrect answers</h3>' +
+          '<div class="review-list">' + items + '</div>';
+      }
+
+      document.getElementById('question-view').classList.add('hidden');
+      document.getElementById('results-view').classList.remove('hidden');
+      document.getElementById('results-view').innerHTML =
+        '<div class="score-display ' + (passed ? 'passed' : 'failed') + '">' +
+          '<div class="score-number">' + percent + '%</div>' +
+          '<div class="score-label">' + (passed ? '&#10003; Passed' : '&#10007; Not yet passed') + '</div>' +
+          '<div class="score-sub">' +
+            score + ' of ' + quizData.length + ' correct' +
+            (!passed ? ' &mdash; 80% required to pass' : '') +
+          '</div>' +
+        '</div>' +
+        reviewHtml +
+        (passed
+          ? '<button class="retry-btn" onclick="showCertificate()">View / Print Certificate</button>'
+          : '') +
+        '<button class="retry-btn" onclick="retry()">Retry Quiz</button>';
+    }
+
+    /* ── Retry ──────────────────────────────────────────────── */
+    function retry() {
+      current = 0;
+      score   = 0;
+      results = [];
+      showQuestion();
+    }
+
+    /* ── Init ───────────────────────────────────────────────── */
+    window.addEventListener('load', function () {
+      if (isExpired()) {
+        showLicenseExpired();
+        return;
+      }
+      initScorm();
+      if (quizData.length === 0) {
+        document.getElementById('question-view').innerHTML = '<p>No quiz available.</p>';
+        return;
+      }
+      loadProgress();
+      /* If all questions were answered (e.g. orphaned save), show results. */
+      if (current >= quizData.length && results.length > 0) {
+        showResults();
+      } else {
+        showQuestion();
+      }
+    });
+  </script>
+</head>
+<body>
+  <h1>{{TITLE}}</h1>
+  <div id="question-view"></div>
+  <div id="results-view" class="hidden"></div>
+  {{CERTIFICATE_PARTIAL}}
+  <div id="license-expired-panel" class="hidden" role="alert">
+    <h2>Training License Expired</h2>
+    <p id="license-expired-message"></p>
+  </div>
+</body>
+</html>

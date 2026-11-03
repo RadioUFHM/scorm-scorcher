@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{TITLE}}</title>
+  <link rel="stylesheet" href="branding.css" />
+
+  <style>
+    /* Video container */
+    #video-container {
+      width: 100%;
+      max-width: 960px;
+      margin: 0 auto 20px;
+      position: relative;
+      padding-bottom: 56.25%;
+      height: 0;
+    }
+    #video-container iframe,
+    #video-container video {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: black;
+    }
+
+    /* Layout */
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #fafafa;
+      color: #333;
+    }
+
+    header {
+      background-color: #0d1b2a;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+
+    #lesson-title {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+
+    main {
+      display: flex;
+      flex-direction: row;
+      gap: 20px;
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 0 15px;
+    }
+
+    /* Sidebar styling */
+    #sidebar {
+      width: 250px;
+      background: #f7f7f7;
+      border-right: 1px solid #ddd;
+      padding: 15px;
+      height: fit-content;
+      border-radius: 8px;
+    }
+    #sidebar h2 {
+      font-size: 1rem;
+      margin-bottom: 10px;
+      color: #0d1b2a;
+    }
+    #sidebar ul {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+    }
+    #sidebar li {
+      margin-bottom: 8px;
+    }
+    #sidebar a {
+      text-decoration: none;
+      color: #0077cc;
+      cursor: pointer;
+    }
+    #sidebar a:hover {
+      text-decoration: underline;
+    }
+
+    /* Transcript */
+    #transcript-container {
+      flex: 1;
+      padding: 15px;
+      background: white;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    #transcript-container table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    #transcript-container td {
+      padding: 8px;
+      border-bottom: 1px solid #eee;
+      text-align: left;
+    }
+    #transcript-container tr.active {
+      background-color: #e9f5ff;
+    }
+
+    /* Mobile */
+    @media (max-width: 768px) {
+      main {
+        flex-direction: column;
+      }
+      #sidebar {
+        width: 100%;
+        order: 2;
+        margin-top: 15px;
+      }
+      #transcript-container {
+        order: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1 id="lesson-title">{{TITLE}}</h1>
+</header>
+
+<!-- Video Player -->
+<div id="video-container">
+  <!-- If local video -->
+  <video id="lesson-video" controls>
+    <source src="{{VIDEO}}" type="video/mp4" />
+    Your browser does not support HTML5 video.
+  </video>
+</div>
+
+<main>
+  <!-- Sidebar Navigation -->
+  <div id="sidebar">
+    <h2>Lesson Sections</h2>
+    <div
+      id="seek-warning"
+      style="display:none; padding:8px; margin-bottom:10px; border:1px solid #ffeeba; background:#fff3cd; border-radius:4px; color:#856404; font-size:0.9em;"
+    ></div>
+    <ul id="section-list"></ul>
+  </div>
+
+  <!-- Transcript -->
+  <div id="transcript-container">
+    <table id="transcript-table">
+      <tbody></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+  const transcript = {{TRANSCRIPT_JSON}};
+  const sections = {{SECTIONS_JSON}};
+  const videoUrl = "{{VIDEO}}";
+  const videoType = "{{VIDEO_TYPE}}";
+  const transcriptTable = document.querySelector("#transcript-table tbody");
+  const sectionList = document.querySelector("#section-list");
+  const seekWarning = document.getElementById("seek-warning");
+
+  let videoPlayer = null;
+  let youtubePlayer = null;
+  let isYouTube = false;
+  let isLearnWorlds = false;
+<<<<<<< ours
+=======
+
+  if (videoUrl.includes("learnworlds")) {
+    isLearnWorlds = true;
+    if (seekWarning) {
+      seekWarning.textContent = "Seeking is disabled for LearnWorlds-hosted videos.";
+      seekWarning.style.display = "block";
+    }
+  }
+>>>>>>> theirs
+
+  // Detect YouTube, LearnWorlds, or local MP4
+  if (
+    videoUrl.includes("youtube.com") ||
+    videoUrl.includes("youtu.be") ||
+    videoType === "youtube"
+  ) {
+    isYouTube = true;
+    const videoId = videoUrl.split("v=")[1] || videoUrl.split("/").pop();
+    const iframe = document.createElement("iframe");
+    iframe.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1`;
+    iframe.id = "youtube-player";
+    iframe.allow = "autoplay; encrypted-media";
+    iframe.allowFullscreen = true;
+    iframe.frameBorder = 0;
+
+    const container = document.getElementById("video-container");
+    container.innerHTML = "";
+    container.appendChild(iframe);
+  } else if (
+    videoUrl.includes("learnworlds.com") ||
+    videoUrl.includes("assets.learnworlds.com") ||
+    videoType === "learnworlds"
+  ) {
+    isLearnWorlds = true;
+    const iframe = document.createElement("iframe");
+    iframe.src = videoUrl;
+    iframe.id = "learnworlds-player";
+    iframe.allow = "autoplay; encrypted-media";
+    iframe.allowFullscreen = true;
+    iframe.frameBorder = 0;
+
+    const container = document.getElementById("video-container");
+    container.innerHTML = "";
+    container.appendChild(iframe);
+  } else {
+    videoPlayer = document.getElementById("lesson-video");
+  }
+
+  // Populate transcript table
+  transcript.forEach((entry) => {
+    const row = document.createElement("tr");
+    row.setAttribute("data-start", entry.start_seconds);
+    const timeCell = document.createElement("td");
+    timeCell.textContent = entry.start;
+    const textCell = document.createElement("td");
+    textCell.textContent = entry.text;
+    row.appendChild(timeCell);
+    row.appendChild(textCell);
+    transcriptTable.appendChild(row);
+  });
+
+  // Populate sections sidebar
+  sections.forEach((sec, idx) => {
+    const li = document.createElement("li");
+    const link = document.createElement("a");
+    link.textContent = `${idx + 1}. ${sec.title}`;
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (isLearnWorlds) {
+<<<<<<< ours
+        alert("Seeking disabled for LearnWorlds-hosted videos.");
+=======
+        if (seekWarning) {
+          seekWarning.style.display = "block";
+        }
+>>>>>>> theirs
+        return;
+      }
+      if (isYouTube && youtubePlayer) {
+        youtubePlayer.seekTo(sec.start_seconds, true);
+        youtubePlayer.playVideo();
+      } else if (videoPlayer) {
+        videoPlayer.currentTime = sec.start_seconds;
+        videoPlayer.play();
+      }
+    });
+    li.appendChild(link);
+    sectionList.appendChild(li);
+  });
+
+  // Highlight transcript row based on playback position
+  function highlightTranscript(currentTime) {
+    const rows = transcriptTable.querySelectorAll("tr");
+    rows.forEach((row) => row.classList.remove("active"));
+    for (let i = 0; i < rows.length; i++) {
+      const start = parseFloat(rows[i].getAttribute("data-start"));
+      if (currentTime >= start) {
+        rows[i].classList.add("active");
+      }
+    }
+  }
+
+  // If local MP4
+  if (videoPlayer) {
+    videoPlayer.addEventListener("timeupdate", () => {
+      highlightTranscript(videoPlayer.currentTime);
+    });
+  }
+
+  // If YouTube video → setup YouTube Iframe API
+  if (isYouTube) {
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.body.appendChild(tag);
+
+    window.onYouTubeIframeAPIReady = () => {
+      youtubePlayer = new YT.Player("youtube-player", {
+        events: {
+          onStateChange: () => {
+            setInterval(() => {
+              if (youtubePlayer && youtubePlayer.getCurrentTime) {
+                highlightTranscript(youtubePlayer.getCurrentTime());
+              }
+            }, 500);
+          }
+        }
+      });
+    };
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SCORM Lesson</title>
+    <link rel="stylesheet" href="templates/branding.css" />
+    <script>
+        function searchTranscript() {
+            const input = document.getElementById("searchBox").value.toLowerCase();
+            const rows = document.querySelectorAll("#transcript-table tbody tr");
+            rows.forEach(row => {
+                row.style.display = row.innerText.toLowerCase().includes(input) ? "" : "none";
+            });
+        }
+
+        function seekVideo(seconds) {
+            const video = document.getElementById("lesson-video");
+            if(video && !video.paused) {
+                video.currentTime = seconds;
+                video.play();
+            }
+        }
+    </script>
+</head>
+<body>
+    <header>
+        <h1 id="lesson-title">SCORM Lesson</h1>
+        <video id="lesson-video" width="100%" controls style="display:none;">
+            <source src="" type="video/mp4">
+            Your browser does not support HTML5 video.
+        </video>
+        <iframe id="lesson-video-embed" width="100%" height="400" style="display:none;" frameborder="0" allowfullscreen></iframe>
+        <input type="text" id="searchBox" placeholder="Search transcript..." onkeyup="searchTranscript()">
+    </header>
+    <table id="transcript-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Text</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</body>
+</html>

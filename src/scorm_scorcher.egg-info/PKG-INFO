@@ -1,0 +1,44 @@
+Metadata-Version: 2.4
+Name: scorm-scorcher
+Version: 0.1.0
+Summary: Convert video files into SCORM 1.2 packages
+Author-email: fcitradecraft <rio@fcitradecraft.com>
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: click>=8.0
+Provides-Extra: transcribe
+Requires-Dist: openai-whisper; extra == "transcribe"
+Provides-Extra: claude
+Requires-Dist: anthropic>=0.40; extra == "claude"
+Provides-Extra: quiz
+Requires-Dist: anthropic>=0.40; extra == "quiz"
+Requires-Dist: openai>=1.0; extra == "quiz"
+Provides-Extra: xlsx
+Requires-Dist: pandas; extra == "xlsx"
+Requires-Dist: openpyxl; extra == "xlsx"
+Provides-Extra: full
+Requires-Dist: openai-whisper; extra == "full"
+Requires-Dist: anthropic>=0.40; extra == "full"
+Requires-Dist: openai>=1.0; extra == "full"
+Requires-Dist: pandas; extra == "full"
+Requires-Dist: openpyxl; extra == "full"
+
+# scorm-scorcher
+
+Convert video files into SCORM 1.2 compliant packages.
+
+## Features
+- Extract audio and generate subtitles
+- Segment video every 360 seconds
+- Generate quizzes from transcript using OpenAI
+- Output quizzes as JSON and XLSX
+- Package assets into a SCORM 1.2 zip
+
+## Usage
+```
+scorm-scorcher <video-file> --output-dir <dir>
+```
+
+The output directory is optional and defaults to `output/`.
+
+This project is in early development and many features are placeholders.

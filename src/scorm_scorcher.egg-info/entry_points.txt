@@ -1,0 +1,2 @@
+[console_scripts]
+scorm-scorcher = scorm_scorcher.cli:main

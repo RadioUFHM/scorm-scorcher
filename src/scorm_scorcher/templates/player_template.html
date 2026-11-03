@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{TITLE}}</title>
+  <link rel="stylesheet" href="branding.css" />
+
+  <style>
+    .hidden { display: none !important; }
+
+    #video-container {
+      width: 100%;
+      max-width: 960px;
+      margin: 0 auto 20px;
+      position: relative;
+      padding-bottom: 56.25%;
+      height: 0;
+    }
+    #video-container iframe,
+    #video-container video {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: black;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #fafafa;
+      color: #333;
+    }
+
+    header {
+      background-color: #0d1b2a;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+
+    #lesson-title {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+
+    main {
+      display: flex;
+      flex-direction: row;
+      gap: 20px;
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 0 15px;
+    }
+
+    #sidebar {
+      width: 250px;
+      background: #f7f7f7;
+      border-right: 1px solid #ddd;
+      padding: 15px;
+      height: fit-content;
+      border-radius: 8px;
+    }
+    #sidebar h2 {
+      font-size: 1rem;
+      margin-bottom: 10px;
+      color: #0d1b2a;
+    }
+    #sidebar ul {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+    }
+    #sidebar li {
+      margin-bottom: 8px;
+    }
+    #sidebar a {
+      text-decoration: none;
+      color: #0077cc;
+      cursor: pointer;
+    }
+    #sidebar a:hover {
+      text-decoration: underline;
+    }
+
+    #transcript-container {
+      flex: 1;
+      padding: 15px;
+      background: white;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    #transcript-container table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    #transcript-container td {
+      padding: 8px;
+      border-bottom: 1px solid #eee;
+      text-align: left;
+    }
+    #transcript-container tr.active {
+      background-color: #e9f5ff;
+    }
+
+    @media (max-width: 768px) {
+      main { flex-direction: column; }
+      #sidebar { width: 100%; order: 2; margin-top: 15px; }
+      #transcript-container { order: 1; }
+    }
+
+    #license-expired-panel {
+      max-width: 960px;
+      margin: 0 auto 20px;
+      padding: 32px 28px;
+      background: #f7f7f7;
+      border: 2px solid #0d1b2a;
+      border-radius: 8px;
+      text-align: center;
+    }
+    #license-expired-panel h2 {
+      margin: 0 0 10px;
+      color: #0d1b2a;
+    }
+    #license-expired-panel p {
+      margin: 0;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1 id="lesson-title">{{TITLE}}</h1>
+</header>
+
+<div id="video-container">
+  <video id="lesson-video" controls>
+    <source src="{{VIDEO}}" type="video/mp4" />
+    Your browser does not support HTML5 video.
+  </video>
+</div>
+
+<div id="license-expired-panel" class="hidden" role="alert">
+  <h2>Training License Expired</h2>
+  <p id="license-expired-message"></p>
+</div>
+
+<main>
+  <div id="sidebar">
+    <h2>Lesson Sections</h2>
+    <ul id="section-list"></ul>
+  </div>
+
+  <div id="transcript-container">
+    <table id="transcript-table">
+      <tbody></tbody>
+    </table>
+  </div>
+</main>
+
+<script src="scorm-shim.js"></script>
+<script>
+  const transcript = {{TRANSCRIPT_JSON}};
+  const sections = {{SECTIONS_JSON}};
+  const videoUrl = "{{VIDEO}}";
+  const videoType = "{{VIDEO_TYPE}}";
+  const transcriptTable = document.querySelector("#transcript-table tbody");
+  const sectionList = document.querySelector("#section-list");
+
+  let videoPlayer = null;
+  let youtubePlayer = null;
+  let isYouTube = false;
+
+  /* ── License expiry (kill switch for --video-mode url builds) ────────── */
+  const videoExpiry = "{{VIDEO_EXPIRY}}"; // ISO string, or "" if not gated
+  const licenseMessage = {{LICENSE_MESSAGE_JSON}};
+  let licenseExpired = false;
+
+  function isExpired() {
+    if (!videoExpiry) return false;
+    const exp = new Date(videoExpiry);
+    return !isNaN(exp.getTime()) && Date.now() >= exp.getTime();
+  }
+
+  function showLicenseExpired() {
+    if (licenseExpired) return; // idempotent — the timestamp check and the
+                                 // video error event can both fire
+    licenseExpired = true;
+    document.getElementById("video-container").classList.add("hidden");
+    document.getElementById("license-expired-message").textContent = licenseMessage;
+    document.getElementById("license-expired-panel").classList.remove("hidden");
+  }
+
+  /* ── SCORM tracking ──────────────────────────────────────── */
+  let scormCompleted = false;
+  let lastSavedSec = -1;
+  const SAVE_EVERY_SEC = 10;
+
+  function scormInit() {
+    if (!ScormShim.init()) return;
+    const status = ScormShim.getStatus();
+    if (status === 'completed' || status === 'passed') {
+      scormCompleted = true;
+    } else {
+      ScormShim.setIncomplete();
+      ScormShim.commit();
+    }
+  }
+
+  function scormSavePos(sec) {
+    if (!ScormShim.isActive() || scormCompleted || licenseExpired) return;
+    const floored = Math.floor(sec);
+    if (floored - lastSavedSec < SAVE_EVERY_SEC) return;
+    lastSavedSec = floored;
+    ScormShim.setSuspendData(JSON.stringify({ v: 1, pos: floored }));
+    ScormShim.commit();
+  }
+
+  function scormLoadPos() {
+    if (!ScormShim.isActive()) return 0;
+    try {
+      const raw = ScormShim.getSuspendData();
+      if (!raw) return 0;
+      const d = JSON.parse(raw);
+      return (d.v === 1 && d.pos > 0) ? d.pos : 0;
+    } catch (e) { return 0; }
+  }
+
+  function scormComplete() {
+    if (!ScormShim.isActive() || scormCompleted || licenseExpired) return;
+    scormCompleted = true;
+    ScormShim.setSuspendData('');
+    ScormShim.setCompleted();
+    ScormShim.commit();
+  }
+
+  scormInit();
+
+  if (isExpired()) {
+    showLicenseExpired();
+  } else {
+    setUpPlayer();
+  }
+
+  function setUpPlayer() {
+  if (videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be") || videoType === "youtube") {
+    isYouTube = true;
+    const videoId = videoUrl.split("v=")[1] || videoUrl.split("/").pop();
+    const iframe = document.createElement("iframe");
+    iframe.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1`;
+    iframe.id = "youtube-player";
+    iframe.allow = "autoplay; encrypted-media";
+    iframe.allowFullscreen = true;
+    iframe.frameBorder = 0;
+    const container = document.getElementById("video-container");
+    container.innerHTML = "";
+    container.appendChild(iframe);
+  } else {
+    videoPlayer = document.getElementById("lesson-video");
+  }
+
+  transcript.forEach((entry) => {
+    const row = document.createElement("tr");
+    row.setAttribute("data-start", entry.start_seconds);
+    const timeCell = document.createElement("td");
+    timeCell.textContent = entry.start;
+    const textCell = document.createElement("td");
+    textCell.textContent = entry.text;
+    row.appendChild(timeCell);
+    row.appendChild(textCell);
+    transcriptTable.appendChild(row);
+  });
+
+  sections.forEach((sec, idx) => {
+    const li = document.createElement("li");
+    const link = document.createElement("a");
+    link.textContent = `${idx + 1}. ${sec.title}`;
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (isYouTube && youtubePlayer) {
+        youtubePlayer.seekTo(sec.start_seconds, true);
+        youtubePlayer.playVideo();
+      } else if (videoPlayer) {
+        videoPlayer.currentTime = sec.start_seconds;
+        videoPlayer.play();
+      }
+    });
+    li.appendChild(link);
+    sectionList.appendChild(li);
+  });
+
+  function highlightTranscript(currentTime) {
+    const rows = transcriptTable.querySelectorAll("tr");
+    rows.forEach((row) => row.classList.remove("active"));
+    for (let i = 0; i < rows.length; i++) {
+      const start = parseFloat(rows[i].getAttribute("data-start"));
+      if (currentTime >= start) {
+        rows[i].classList.add("active");
+      }
+    }
+  }
+
+  if (videoPlayer) {
+    /* Load failure (e.g. a signed URL the LMS blocks outright) — same
+       branded panel as a passed expiry timestamp, and never report
+       completion/progress once shown. */
+    videoPlayer.addEventListener("error", () => showLicenseExpired(), { once: true });
+
+    /* Seek to saved position once the video is seekable. */
+    videoPlayer.addEventListener("canplay", () => {
+      const saved = scormLoadPos();
+      if (saved > 0) videoPlayer.currentTime = saved;
+    }, { once: true });
+
+    videoPlayer.addEventListener("timeupdate", () => {
+      if (licenseExpired) return;
+      const t = videoPlayer.currentTime;
+      highlightTranscript(t);
+      scormSavePos(t);
+      if (!scormCompleted && videoPlayer.duration &&
+          t / videoPlayer.duration >= 0.8) {
+        scormComplete();
+      }
+    });
+
+    videoPlayer.addEventListener("ended", () => {
+      if (!licenseExpired) scormComplete();
+    });
+  }
+
+  if (isYouTube) {
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.body.appendChild(tag);
+
+    window.onYouTubeIframeAPIReady = () => {
+      youtubePlayer = new YT.Player("youtube-player", {
+        events: {
+          onReady: () => {
+            const saved = scormLoadPos();
+            if (saved > 0) youtubePlayer.seekTo(saved, true);
+          },
+          onStateChange: () => {
+            setInterval(() => {
+              if (!youtubePlayer || !youtubePlayer.getCurrentTime) return;
+              const t = youtubePlayer.getCurrentTime();
+              highlightTranscript(t);
+              scormSavePos(t);
+              const dur = youtubePlayer.getDuration ? youtubePlayer.getDuration() : 0;
+              if (!scormCompleted && dur && t / dur >= 0.8) scormComplete();
+            }, 500);
+          }
+        }
+      });
+    };
+  }
+  } // end setUpPlayer
+</script>
+</body>
+</html>

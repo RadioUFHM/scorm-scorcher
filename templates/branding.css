@@ -1,0 +1,132 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Lora&display=swap');
+
+body {
+    display: flex;
+    font-family: 'Lora', serif;
+    margin: 0;
+    background-color: #f8f9fa;
+    color: #000000;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 260px;
+    background-color: #284A23;
+    color: #fff;
+    padding: 20px;
+    height: 100vh;
+    position: fixed;
+    overflow-y: auto;
+}
+
+.sidebar h2 {
+    font-family: 'Montserrat', sans-serif;
+    margin-top: 0;
+}
+
+.sidebar ul {
+    list-style: none;
+    padding: 0;
+}
+
+.sidebar li {
+    margin: 10px 0;
+}
+
+.sidebar li.active a {
+    font-weight: bold;
+    color: #BFA057;
+}
+
+.sidebar a {
+    text-decoration: none;
+    color: #fff;
+}
+
+/* Main Content */
+main {
+    margin-left: 280px;
+    padding: 20px;
+    flex: 1;
+}
+
+h1 {
+    font-family: 'Montserrat', sans-serif;
+    color: #374B82;
+}
+
+#searchBox {
+    margin-top: 10px;
+    padding: 8px;
+    border: 2px solid #374B82;
+    border-radius: 5px;
+    font-size: 14px;
+    width: 100%;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+th {
+    background-color: #284A23;
+    color: #fff;
+    padding: 10px;
+    position: sticky;
+    top: 0;
+}
+
+td {
+    padding: 8px;
+    border: 1px solid #ddd;
+}
+
+tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+.nav-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+
+.button {
+    background-color: #284A23;
+    color: white;
+    padding: 8px 14px;
+    border-radius: 5px;
+    text-decoration: none;
+}
+
+.button:hover {
+    background-color: #BFA057;
+    color: #000;
+}
+#transcript-table tbody tr.active {
+    background-color: #BFA057 !important;
+    color: #000;
+    font-weight: bold;
+}
+.edit-button {
+  display: block;
+  background-color: #004488;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.edit-button.active {
+  background-color: #00aa88;
+}
+.sidebar li.editing input {
+  width: 100%;
+  border: none;
+  padding: 4px;
+  font-size: 14px;
+}

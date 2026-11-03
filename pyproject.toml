@@ -1,25 +1,35 @@
 [project]
 name = "scorm-scorcher"
 version = "0.1.0"
-description = "Convert Video to SCORM Packages"
-authors = [{name = "Your Name", email = "you@example.com"}]
+description = "Convert video files into SCORM 1.2 packages"
+authors = [{name = "fcitradecraft", email = "rio@fcitradecraft.com"}]
 requires-python = ">=3.10"
 readme = "README.md"
+dependencies = [
+    "click>=8.0",
+]
 
 [project.scripts]
 scorm-scorcher = "scorm_scorcher.cli:main"
+
+[project.optional-dependencies]
+# Whisper for local audio transcription
+transcribe = ["openai-whisper"]
+# Claude (Anthropic) API for AI-generated quiz questions — preferred
+claude = ["anthropic>=0.40"]
+# OpenAI API for AI-generated quiz questions — fallback
+quiz = ["anthropic>=0.40", "openai>=1.0"]
+# XLSX quiz export
+xlsx = ["pandas", "openpyxl"]
+# Everything
+full = ["openai-whisper", "anthropic>=0.40", "openai>=1.0", "pandas", "openpyxl"]
 
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
-[project.optional-dependencies]
-full = [
-    "click",
-    "openai",
-    "pandas",
-    "moviepy",
-    "srt",
-    "python-docx",
-    "jinja2",
-]
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+scorm_scorcher = ["templates/*"]
