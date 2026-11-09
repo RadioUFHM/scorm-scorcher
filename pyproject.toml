@@ -1,7 +1,7 @@
 [project]
 name = "scorm-scorcher"
 version = "0.1.0"
-description = "Convert video files into SCORM 1.2 packages"
+description = "Convert video files into SCORM 1.2 and 2004 packages"
 authors = [{name = "fcitradecraft", email = "rio@fcitradecraft.com"}]
 requires-python = ">=3.10"
 readme = "README.md"
