@@ -23,26 +23,37 @@ VIDEO_MODES = ("embed", "url", "youtube")
 
 # Files each SCO needs, as listed in imsmanifest.xml. The packager zips exactly
 # what the manifest lists, so these lists are the package allowlist.
+# quiz.json is not shipped: its questions are copied into quiz.html at build
+# time and the page never reads the file. It stays in the build folder for editing.
 PLAYER_FILES = ("index.html", BRANDING_NAME, SCORM_SHIM_NAME)
-QUIZ_FILES = (QUIZ_HTML_NAME, QUIZ_JSON_NAME, BRANDING_NAME, SCORM_SHIM_NAME)
+QUIZ_FILES = (QUIZ_HTML_NAME, BRANDING_NAME, SCORM_SHIM_NAME)
 
 def _html_text(value: str) -> str:
     """Escape a user-supplied value for HTML text or a quoted attribute."""
     return html.escape(value, quote=True)
 
 
-def _js_string(value: str) -> str:
-    """Encode a value as a JavaScript string literal that is safe inside <script>.
+def _script_safe(json_text: str) -> str:
+    """Make JSON text safe to place inside a <script> block.
 
-    json.dumps handles quotes and backslashes; '<', '>' and '&' are also
-    encoded so a value containing '</script>' cannot end the script block.
+    In valid JSON, '<', '>' and '&' can only occur inside strings, where the
+    \\u escapes mean the same characters. So the data is unchanged, but text
+    such as '</script>' can no longer end the script block early.
     """
     return (
-        json.dumps(value)
+        json_text
         .replace("<", "\\u003c")
         .replace(">", "\\u003e")
         .replace("&", "\\u0026")
     )
+
+
+def _script_json(value) -> str:
+    """Encode a value (string, list, dict…) as JSON that is safe inside <script>.
+
+    A JSON value is also a valid JavaScript literal.
+    """
+    return _script_safe(json.dumps(value))
 
 
 DEFAULT_LICENSE_MESSAGE = (
@@ -101,13 +112,13 @@ def generate_player_html(
 
     html = (
         template
-        .replace("{{TRANSCRIPT_JSON}}", json.dumps(transcript))
-        .replace("{{SECTIONS_JSON}}", json.dumps(sections))
+        .replace("{{TRANSCRIPT_JSON}}", _script_json(transcript))
+        .replace("{{SECTIONS_JSON}}", _script_json(sections))
         .replace("{{TITLE}}", _html_text(title))
         .replace("{{VIDEO}}", video_value)
         .replace("{{VIDEO_TYPE}}", video_type)
         .replace("{{VIDEO_EXPIRY}}", expiry_value)
-        .replace("{{LICENSE_MESSAGE_JSON}}", json.dumps(license_message or DEFAULT_LICENSE_MESSAGE))
+        .replace("{{LICENSE_MESSAGE_JSON}}", _script_json(license_message or DEFAULT_LICENSE_MESSAGE))
     )
 
     out = output_dir / "index.html"
@@ -138,11 +149,11 @@ def generate_quiz_html(
 
     html = (
         template
-        .replace("{{TITLE_JSON}}", _js_string(title))
+        .replace("{{TITLE_JSON}}", _script_json(title))
         .replace("{{TITLE}}", _html_text(title))
-        .replace("{{QUIZ_DATA}}", quiz_data)
+        .replace("{{QUIZ_DATA}}", _script_safe(quiz_data))
         .replace("{{VIDEO_EXPIRY}}", video_expiry or "")
-        .replace("{{LICENSE_MESSAGE_JSON}}", json.dumps(license_message or DEFAULT_LICENSE_MESSAGE))
+        .replace("{{LICENSE_MESSAGE_JSON}}", _script_json(license_message or DEFAULT_LICENSE_MESSAGE))
         .replace("{{CERTIFICATE_PARTIAL}}", certificate_partial)
     )
     out = output_dir / QUIZ_HTML_NAME
@@ -220,7 +231,9 @@ def manifest_extra_files(output_dir: Path) -> List[str]:
     path = output_dir / MANIFEST_NAME
     if not path.is_file():
         return []
-    standard = set(PLAYER_FILES) | set(QUIZ_FILES)
+    # quiz.json counts as standard so a manifest written before it was dropped
+    # from QUIZ_FILES doesn't carry it forward as an "extra" file.
+    standard = set(PLAYER_FILES) | set(QUIZ_FILES) | {QUIZ_JSON_NAME}
     return [name for name in manifest_files(path) if name not in standard]
 
 

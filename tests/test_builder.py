@@ -306,3 +306,74 @@ def test_quiz_page_and_certificate_title_round_trip(tmp_path, title):
     match = re.search(r'courseTitle:\s*("(?:[^"\\]|\\.)*")\s*,', script)
     assert match, "courseTitle not found inside a <script> block"
     assert json.loads(match.group(1)) == title
+
+
+# --- quiz.json is not shipped (Option A) ---
+
+def test_quiz_manifest_does_not_list_quiz_json(tmp_path):
+    from scorm_scorcher.scorm_packager import manifest_files
+
+    for version in ("1.2", "2004"):
+        generate_manifest("Lesson", tmp_path, include_quiz=True, scorm_version=version)
+        listed = manifest_files(tmp_path / "imsmanifest.xml")
+        assert QUIZ_HTML_NAME in listed
+        assert QUIZ_JSON_NAME not in listed
+
+
+def test_old_manifest_listing_quiz_json_does_not_carry_it_forward(tmp_path):
+    from scorm_scorcher.builder import manifest_extra_files
+
+    (tmp_path / "imsmanifest.xml").write_text(
+        '<manifest><resources>'
+        '<resource href="index.html"><file href="index.html"/><file href="lesson.mp4"/></resource>'
+        '<resource href="quiz.html"><file href="quiz.html"/><file href="quiz.json"/></resource>'
+        '</resources></manifest>',
+        encoding="utf-8",
+    )
+    assert manifest_extra_files(tmp_path) == ["lesson.mp4"]
+
+
+# --- Text placed in page scripts cannot end the <script> block ---
+
+PAYLOAD = "</script><script>window.injected = 1;</script> & <b>"
+
+
+def test_player_page_script_data_is_inert_and_round_trips(tmp_path):
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"")
+    plain = _read_page(generate_player_html(TRANSCRIPT, SECTIONS, "T", tmp_path, str(video), video_mode="embed"))
+
+    transcript = [dict(TRANSCRIPT[0], text=PAYLOAD)]
+    sections = [dict(SECTIONS[0], title=PAYLOAD)]
+    out = generate_player_html(
+        transcript, sections, "T", tmp_path, str(video), video_mode="embed", license_message=PAYLOAD
+    )
+    content = out.read_text(encoding="utf-8")
+    assert len(_read_page(out).scripts) == len(plain.scripts)
+    assert "<script>window.injected" not in content
+
+    def value(name):
+        match = re.search(rf"const {name} = (.*);\n", content)
+        assert match, name
+        return json.loads(match.group(1))
+
+    assert value("transcript") == transcript
+    assert value("sections") == sections
+    assert value("licenseMessage") == PAYLOAD
+
+
+def test_quiz_page_script_data_is_inert_and_round_trips(tmp_path):
+    (tmp_path / QUIZ_JSON_NAME).write_text('{"questions": []}', encoding="utf-8")
+    plain = _read_page(generate_quiz_html(tmp_path, "T"))
+
+    quiz = {"questions": [{"type": "true_false", "prompt": PAYLOAD, "answer": True}]}
+    (tmp_path / QUIZ_JSON_NAME).write_text(json.dumps(quiz), encoding="utf-8")
+    out = generate_quiz_html(tmp_path, "T", license_message=PAYLOAD)
+    content = out.read_text(encoding="utf-8")
+    assert len(_read_page(out).scripts) == len(plain.scripts)
+    assert "<script>window.injected" not in content
+
+    data = re.search(r"var quizData = \((.*)\.questions \|\| \[\]\);", content)
+    assert data and json.loads(data.group(1)) == quiz
+    message = re.search(r"var licenseMessage = (.*);\n", content)
+    assert message and json.loads(message.group(1)) == PAYLOAD

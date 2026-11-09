@@ -299,6 +299,9 @@ def test_run_auto_ships_video_and_no_working_files(tmp_path):
     assert result.exit_code == 0, result.output
     names = _zip_names(out / "Run_Lesson_SCORM.zip")
     assert "lesson.mp4" in names
+    assert "quiz.html" in names
+    assert "quiz.json" not in names  # edited in the build folder, never shipped
+    assert (out / "quiz.json").exists()
     assert "audio.mp3" not in names
     assert not any(n.endswith((".srt", ".md", ".sections")) for n in names)
 

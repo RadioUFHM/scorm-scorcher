@@ -59,7 +59,7 @@ scorm-scorcher package --input ./build --title "My Lesson"
   `quiz.html` at this step.
 - **package** — zips `imsmanifest.xml` and exactly the files it lists into a
   SCORM `.zip`. Working files in the folder (`audio.mp3`, `.srt`,
-  `transcript.md`, `.sections`, video segments) are never packaged. If a
+  `transcript.md`, `.sections`, `quiz.json`, video segments) are never packaged. If a
   listed file is missing, packaging stops and names it.
 
 ### Editing the quiz
@@ -99,10 +99,10 @@ entirely in the browser — no server involved.
 ## Quiz answer key
 
 The quiz is graded in the learner's browser, so the correct answers ship
-inside the package: in `quiz.html`, and in `quiz.json`, which the page does
-not read. A learner who opens the page source can find them. SCORM has no
-server-side grading, so this is true of browser-graded SCORM quizzes in
-general.
+inside the package, in `quiz.html`. A learner who opens the page source can
+find them. SCORM has no server-side grading, so this is true of browser-graded
+SCORM quizzes in general. (`quiz.json`, your editable copy, stays in the build
+folder and is not packaged.)
 
 Treat the quiz as a completion and comprehension check, not a secure exam.
 Each answer, and the correct response, is also sent to the LMS through
