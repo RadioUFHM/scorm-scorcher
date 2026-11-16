@@ -169,8 +169,9 @@ def prepare(video: str, output: str, subtitles: str | None, interval: int, no_se
 def quiz(input_dir: str, num_questions: int, xlsx: bool) -> None:
     """Generate quiz.json from the markdown transcript.
 
-    Uses OpenAI GPT-4o-mini when OPENAI_API_KEY is set; otherwise uses a
-    built-in word-blanking fallback that requires no API key.
+    Uses Claude when ANTHROPIC_API_KEY is set, else OpenAI GPT-4o-mini when
+    OPENAI_API_KEY is set; otherwise uses a built-in word-blanking fallback
+    that requires no API key.
     """
     try:
         out_dir = Path(input_dir)

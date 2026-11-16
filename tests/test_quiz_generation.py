@@ -59,3 +59,50 @@ def test_save_quiz_to_json(tmp_path):
     assert "questions" in data
     assert data["questions"][0]["prompt"] == "Q?"
     assert data["questions"][0]["answer"] == "A"
+
+
+# ── Claude generation (anthropic client mocked) ──────────────────────────────
+
+def _fake_anthropic(monkeypatch, text, stop_reason="end_turn"):
+    import sys
+    import types
+
+    calls = {}
+
+    class _Messages:
+        def create(self, **kwargs):
+            calls.update(kwargs)
+            block = types.SimpleNamespace(text=text)
+            return types.SimpleNamespace(content=[block], stop_reason=stop_reason)
+
+    class _Client:
+        def __init__(self, api_key):
+            self.messages = _Messages()
+
+    monkeypatch.setitem(sys.modules, "anthropic", types.SimpleNamespace(Anthropic=_Client))
+    return calls
+
+
+def test_claude_max_tokens_scales_with_question_count(tmp_path, monkeypatch):
+    from scorm_scorcher.quiz_generation import _generate_claude
+
+    md = tmp_path / "t.md"
+    md.write_text(TRANSCRIPT_MD, encoding="utf-8")
+    item = {"type": "multiple_choice", "prompt": "Q?", "options": ["a", "b"], "answer": "a"}
+    calls = _fake_anthropic(monkeypatch, json.dumps([item] * 10))
+
+    questions = _generate_claude(str(md), 10, "key")
+
+    assert len(questions) == 10
+    assert calls["max_tokens"] >= 4000
+
+
+def test_claude_truncated_reply_raises_clear_error(tmp_path, monkeypatch):
+    from scorm_scorcher.quiz_generation import _generate_claude
+
+    md = tmp_path / "t.md"
+    md.write_text(TRANSCRIPT_MD, encoding="utf-8")
+    _fake_anthropic(monkeypatch, '[{"prompt": "Q?",', stop_reason="max_tokens")
+
+    with pytest.raises(RuntimeError, match="cut off"):
+        _generate_claude(str(md), 10, "key")

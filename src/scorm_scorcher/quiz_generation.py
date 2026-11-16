@@ -90,7 +90,8 @@ def _generate_claude(md_path: str, num_questions: int, api_key: str) -> List[Qui
 
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=2048,
+        # ~250 tokens per question; 2048 truncated a 10-question quiz.
+        max_tokens=max(4096, 400 * num_questions),
         system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
         messages=[{
             "role": "user",
@@ -103,6 +104,12 @@ def _generate_claude(md_path: str, num_questions: int, api_key: str) -> List[Qui
             ],
         }],
     )
+
+    if response.stop_reason == "max_tokens":
+        raise RuntimeError(
+            f"Claude's reply was cut off before all {num_questions} questions were "
+            "written. Try a smaller --num-questions."
+        )
 
     content = response.content[0].text.strip()
     content = re.sub(r"^```[a-z]*\n?", "", content)
