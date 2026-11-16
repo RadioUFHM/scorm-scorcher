@@ -54,9 +54,9 @@ scorm-scorcher package --input ./build --title "My Lesson"
   `ANTHROPIC_API_KEY` is set, otherwise OpenAI if `OPENAI_API_KEY` is set,
   otherwise a built-in word-blanking fallback that needs no API key at all.
   Add `--xlsx` to also export the quiz as a spreadsheet.
-- **build** — renders the HTML video player and quiz page and writes
-  `imsmanifest.xml`. The quiz questions are copied from `quiz.json` into
-  `quiz.html` at this step.
+- **build** — renders the lesson page (`index.html`: video player plus quiz)
+  and writes `imsmanifest.xml`. The quiz questions are copied from `quiz.json`
+  into `index.html` at this step.
 - **package** — zips `imsmanifest.xml` and exactly the files it lists into a
   SCORM `.zip`. Working files in the folder (`audio.mp3`, `.srt`,
   `transcript.md`, `.sections`, `quiz.json`, video segments) are never packaged. If a
@@ -90,6 +90,23 @@ pauses so you can edit the quiz, and rebuilds from your edited file.
 `build`, `package`, and `run` take `--scorm {1.2,2004,both}` (default `1.2`).
 `both` produces two zip files, one per version, from the same build.
 
+## Watching the video unlocks the quiz
+
+The video and the quiz are one page and one SCO, so the quiz can't be opened
+from the LMS menu early. On a learner's first viewing:
+
+- They can rewind at any time but can't skip past the furthest point they've
+  watched, including through chapter links (later chapters show a lock).
+- Playback speed is capped at 2x.
+- When the video ends, the quiz appears below it and the page scrolls to it.
+
+Progress is saved to the LMS (`cmi.suspend_data`, with `cmi.exit` set to
+`suspend`), so a learner who leaves and comes back resumes where they were,
+and anyone who has finished the video once can seek freely and go straight
+to the quiz. Failing the quiz allows an immediate retake; a retake never
+lowers a pass already recorded. Without a quiz, finishing the video marks the
+lesson complete.
+
 ## Certificate
 
 When a learner scores 80% or higher on the quiz, a "View / Print Certificate"
@@ -99,7 +116,7 @@ entirely in the browser — no server involved.
 ## Quiz answer key
 
 The quiz is graded in the learner's browser, so the correct answers ship
-inside the package, in `quiz.html`. A learner who opens the page source can
+inside the package, in `index.html`. A learner who opens the page source can
 find them. SCORM has no server-side grading, so this is true of browser-graded
 SCORM quizzes in general. (`quiz.json`, your editable copy, stays in the build
 folder and is not packaged.)
@@ -124,13 +141,18 @@ can preview a build directly in a plain browser:
 ```
 scorm-scorcher build --video lesson.mp4 --input ./build --title "My Lesson"
 cd build
-python3 -m http.server 8000
+npx --yes http-server -p 8000
 ```
 
-Then open `http://localhost:8000/index.html` (video player) and
-`http://localhost:8000/quiz.html` (quiz) in your browser. Serving it over
-`http://` rather than double-clicking the file avoids browser quirks with
-local video/iframe playback.
+Then open `http://localhost:8000/` in your browser. Use a server that supports
+HTTP range requests, like `http-server`: Python's `python3 -m http.server`
+does not, so the browser can't jump around in the video and chapter links
+restart it from 0:00. Serving over `http://` rather than double-clicking the
+file also avoids browser quirks with local video/iframe playback.
+
+The quiz stays locked until the whole video has played. To check the quiz
+without watching, open `http://localhost:8000/?unlock`. This only works with
+no LMS present; inside an LMS the gate always applies.
 
 This lets you check video playback, transcript sync, the quiz flow and
 feedback, the certificate (pass the quiz to see it), and the license-expired

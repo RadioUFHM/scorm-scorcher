@@ -7,25 +7,8 @@
   <link rel="stylesheet" href="branding.css" />
 
   <style>
+    * { box-sizing: border-box; }
     .hidden { display: none !important; }
-
-    #video-container {
-      width: 100%;
-      max-width: 960px;
-      margin: 0 auto 20px;
-      position: relative;
-      padding-bottom: 56.25%;
-      height: 0;
-    }
-    #video-container iframe,
-    #video-container video {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%;
-      height: 100%;
-      border: none;
-      background: black;
-    }
 
     body {
       font-family: Arial, Helvetica, sans-serif;
@@ -41,11 +24,36 @@
       padding: 20px;
       text-align: center;
     }
+    #lesson-title { margin: 0; font-size: 1.5rem; }
 
-    #lesson-title {
-      margin: 0;
-      font-size: 1.5rem;
+    #video-container {
+      width: 100%;
+      max-width: 960px;
+      margin: 20px auto 12px;
+      position: relative;
+      padding-bottom: 56.25%;
+      height: 0;
     }
+    #video-container iframe,
+    #video-container video {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: black;
+    }
+
+    #watch-notice {
+      max-width: 960px;
+      margin: 0 auto 12px;
+      padding: 10px 14px;
+      background: #e9f5ff;
+      border-left: 4px solid #0077cc;
+      border-radius: 4px;
+      font-size: 0.92rem;
+    }
+    #watch-notice.flash { background: #fff4d6; border-left-color: #b26a00; }
 
     main {
       display: flex;
@@ -64,27 +72,14 @@
       height: fit-content;
       border-radius: 8px;
     }
-    #sidebar h2 {
-      font-size: 1rem;
-      margin-bottom: 10px;
-      color: #0d1b2a;
-    }
-    #sidebar ul {
-      list-style: none;
-      padding-left: 0;
-      margin: 0;
-    }
-    #sidebar li {
-      margin-bottom: 8px;
-    }
-    #sidebar a {
-      text-decoration: none;
-      color: #0077cc;
-      cursor: pointer;
-    }
-    #sidebar a:hover {
-      text-decoration: underline;
-    }
+    #sidebar h2 { font-size: 1rem; margin-bottom: 10px; color: #0d1b2a; }
+    #sidebar ul { list-style: none; padding-left: 0; margin: 0; }
+    #sidebar li { margin-bottom: 8px; }
+    #sidebar a { text-decoration: none; color: #0077cc; cursor: pointer; }
+    #sidebar a:hover { text-decoration: underline; }
+    #sidebar a.locked { color: #999; cursor: not-allowed; }
+    #sidebar a.locked:hover { text-decoration: none; }
+    #sidebar a.locked::after { content: " \1F512"; font-size: 0.8em; }
 
     #transcript-container {
       flex: 1;
@@ -95,18 +90,9 @@
       max-height: 70vh;
       overflow-y: auto;
     }
-    #transcript-container table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    #transcript-container td {
-      padding: 8px;
-      border-bottom: 1px solid #eee;
-      text-align: left;
-    }
-    #transcript-container tr.active {
-      background-color: #e9f5ff;
-    }
+    #transcript-container table { width: 100%; border-collapse: collapse; }
+    #transcript-container td { padding: 8px; border-bottom: 1px solid #eee; text-align: left; }
+    #transcript-container tr.active { background-color: #e9f5ff; }
 
     @media (max-width: 768px) {
       main { flex-direction: column; }
@@ -123,14 +109,90 @@
       border-radius: 8px;
       text-align: center;
     }
-    #license-expired-panel h2 {
-      margin: 0 0 10px;
-      color: #0d1b2a;
+    #license-expired-panel h2 { margin: 0 0 10px; color: #0d1b2a; }
+    #license-expired-panel p { margin: 0; color: #333; }
+
+    /* ── Quiz (revealed once the video has been watched) ───────── */
+    #quiz-section {
+      max-width: 720px;
+      margin: 32px auto 48px;
+      padding: 24px 20px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
     }
-    #license-expired-panel p {
-      margin: 0;
-      color: #333;
+    #quiz-section h2 { color: #0d1b2a; margin: 0 0 20px; font-size: 1.3rem; }
+
+    #quiz-section .progress-label { font-size: 0.85rem; color: #666; margin-bottom: 6px; }
+    #quiz-section .progress-track {
+      height: 6px; background: #e0e0e0; border-radius: 3px; margin-bottom: 24px; overflow: hidden;
     }
+    #quiz-section .progress-fill {
+      height: 100%; background: #0077cc; border-radius: 3px; transition: width 0.35s ease;
+    }
+    #quiz-section .question-text { font-size: 1.05rem; line-height: 1.55; margin: 0 0 20px; }
+    #quiz-section .options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+    #quiz-section .option {
+      display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px;
+      border: 2px solid #ddd; border-radius: 8px; cursor: pointer;
+      transition: border-color 0.15s, background 0.15s; line-height: 1.4;
+    }
+    #quiz-section .option:hover { border-color: #0077cc; background: #f0f7ff; }
+    #quiz-section .option input[type="radio"] {
+      flex-shrink: 0; margin-top: 2px; width: 18px; height: 18px; cursor: pointer; accent-color: #0077cc;
+    }
+    #quiz-section .option.correct  { border-color: #2e7d32; background: #e8f5e9; }
+    #quiz-section .option.incorrect { border-color: #c62828; background: #ffebee; }
+    #quiz-section .option.correct  span { color: #1b5e20; font-weight: bold; }
+    #quiz-section .option.incorrect span { color: #b71c1c; }
+
+    #quiz-section .feedback {
+      border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; border-left: 4px solid transparent;
+    }
+    #quiz-section .feedback.correct-fb   { background: #e8f5e9; border-left-color: #2e7d32; }
+    #quiz-section .feedback.incorrect-fb { background: #ffebee; border-left-color: #c62828; }
+    #quiz-section .feedback-header { font-weight: bold; margin-bottom: 6px; }
+    #quiz-section .feedback-header.correct   { color: #1b5e20; }
+    #quiz-section .feedback-header.incorrect { color: #b71c1c; }
+    #quiz-section .explanation { margin: 0; font-size: 0.92rem; color: #444; line-height: 1.5; }
+
+    #quiz-section .btn-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    button {
+      padding: 10px 22px; border: none; border-radius: 6px; cursor: pointer;
+      font-size: 0.95rem; font-weight: bold; transition: background 0.15s;
+    }
+    #submit-btn       { background: #0077cc; color: #fff; }
+    #submit-btn:hover { background: #005fa3; }
+    #next-btn         { background: #0d1b2a; color: #fff; }
+    #next-btn:hover   { background: #1a3050; }
+    .retry-btn        { background: #0077cc; color: #fff; margin-top: 28px; }
+    .retry-btn:hover  { background: #005fa3; }
+
+    #quiz-section .score-display {
+      text-align: center; padding: 32px 20px; border-radius: 12px; margin-bottom: 28px;
+      border: 2px solid transparent;
+    }
+    #quiz-section .score-display.passed { background: #e8f5e9; border-color: #2e7d32; }
+    #quiz-section .score-display.failed { background: #ffebee; border-color: #c62828; }
+    #quiz-section .score-number { font-size: 3.2rem; font-weight: bold; line-height: 1; }
+    #quiz-section .score-display.passed .score-number { color: #1b5e20; }
+    #quiz-section .score-display.failed .score-number { color: #b71c1c; }
+    #quiz-section .score-label { font-size: 1.15rem; font-weight: bold; margin: 10px 0 4px; }
+    #quiz-section .score-display.passed .score-label { color: #2e7d32; }
+    #quiz-section .score-display.failed .score-label { color: #c62828; }
+    #quiz-section .score-sub { font-size: 0.9rem; color: #666; }
+    #quiz-section .all-correct { color: #2e7d32; font-weight: bold; font-size: 1rem; margin: 0 0 8px; }
+
+    #quiz-section .review-heading { font-size: 1rem; color: #0d1b2a; margin: 0 0 14px; }
+    #quiz-section .review-list    { display: flex; flex-direction: column; gap: 12px; }
+    #quiz-section .review-item {
+      padding: 14px 16px; border-radius: 8px; border-left: 4px solid #c62828;
+      background: #ffebee; font-size: 0.9rem;
+    }
+    #quiz-section .review-num      { font-weight: bold; color: #c62828; margin-bottom: 6px; }
+    #quiz-section .review-question { margin: 0 0 8px; font-weight: bold; color: #222; }
+    #quiz-section .review-answer   { margin: 2px 0; }
+    #quiz-section .review-expl     { margin: 8px 0 0; color: #555; font-style: italic; line-height: 1.45; }
   </style>
 </head>
 <body>
@@ -140,10 +202,15 @@
 
 <div id="video-container">
   <video id="lesson-video" controls>
-    <source src="{{VIDEO}}" type="video/mp4" />
+    <source src="{{VIDEO_ATTR}}" type="video/mp4" />
     Your browser does not support HTML5 video.
   </video>
 </div>
+
+<p id="watch-notice" class="hidden" role="status">
+  Watch the whole video to unlock the quiz. You can rewind at any time, but
+  you can't skip ahead until you've watched it once.
+</p>
 
 <div id="license-expired-panel" class="hidden" role="alert">
   <h2>Training License Expired</h2>
@@ -163,14 +230,31 @@
   </div>
 </main>
 
+<section id="quiz-section" class="hidden" aria-labelledby="quiz-heading">
+  <h2 id="quiz-heading" tabindex="-1">Knowledge Check</h2>
+  <div id="question-view"></div>
+  <div id="results-view" class="hidden"></div>
+</section>
+
+{{CERTIFICATE_PARTIAL}}
+
 <script src="scorm-shim.js"></script>
 <script>
   const transcript = {{TRANSCRIPT_JSON}};
   const sections = {{SECTIONS_JSON}};
-  const videoUrl = "{{VIDEO}}";
+  const quizData = ({{QUIZ_JSON}}.questions || []);
+  const courseTitle = {{TITLE_JSON}};
+  const videoUrl = {{VIDEO_JSON}};
   const videoType = "{{VIDEO_TYPE}}";
+  const hasQuiz = quizData.length > 0;
+  const PASS_PERCENT = 80;
+  const MAX_FIRST_VIEW_RATE = 2;     // speed cap until the video is watched once
+  const END_TOLERANCE_SEC = 3;       // "reached the end" slack for ended/duration
+  const PLAY_STEP_MAX_SEC = 5;       // largest normal-playback step between updates
+
   const transcriptTable = document.querySelector("#transcript-table tbody");
   const sectionList = document.querySelector("#section-list");
+  const watchNotice = document.getElementById("watch-notice");
 
   let videoPlayer = null;
   let youtubePlayer = null;
@@ -192,53 +276,342 @@
                                  // video error event can both fire
     licenseExpired = true;
     document.getElementById("video-container").classList.add("hidden");
+    watchNotice.classList.add("hidden");
+    document.getElementById("quiz-section").classList.add("hidden");
     document.getElementById("license-expired-message").textContent = licenseMessage;
     document.getElementById("license-expired-panel").classList.remove("hidden");
   }
 
-  /* ── SCORM tracking ──────────────────────────────────────── */
-  let scormCompleted = false;
+  /* ── Saved state (one SCO: video progress and quiz progress share it) ──
+     pos     last playback position (resume point)
+     maxw    furthest point reached by normal playback (skip-ahead limit)
+     watched true once the whole video has been watched; unlocks everything
+     quiz    in-progress quiz: { cur, ans: [chosen option index per answer] } */
+  const state = { v: 2, pos: 0, maxw: 0, watched: false, quiz: null };
+  let lmsStatus = "";
   let lastSavedSec = -1;
   const SAVE_EVERY_SEC = 10;
 
+  function loadState() {
+    if (!ScormShim.isActive()) return;
+    try {
+      const raw = ScormShim.getSuspendData();
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (d.v === 2) {
+        state.pos = d.pos > 0 ? d.pos : 0;
+        state.maxw = d.maxw > 0 ? d.maxw : 0;
+        state.watched = !!d.watched;
+        state.quiz = d.quiz || null;
+      } else if (d.v === 1 && d.pos > 0) {
+        state.pos = state.maxw = d.pos;   // saved by an older build of this page
+      }
+    } catch (e) { /* unreadable saved state: start fresh */ }
+  }
+
+  function saveState() {
+    if (!ScormShim.isActive() || licenseExpired) return;
+    let s = JSON.stringify(state);
+    if (s.length > 4000) {               // SCORM 1.2 caps suspend_data at 4096
+      s = JSON.stringify(Object.assign({}, state, { quiz: null }));
+    }
+    ScormShim.setSuspendData(s);
+    ScormShim.commit();
+  }
+
   function scormInit() {
-    if (!ScormShim.init()) return;
-    const status = ScormShim.getStatus();
-    if (status === 'completed' || status === 'passed') {
-      scormCompleted = true;
+    if (!ScormShim.init()) {
+      // Local preview only (no LMS, nothing is recorded): ?unlock skips the
+      // first-viewing gate so the quiz can be checked without a full watch.
+      if (/[?&]unlock\b/.test(location.search)) state.watched = true;
+      return;
+    }
+    lmsStatus = ScormShim.getStatus();
+    loadState();
+    // Reaching the quiz (or finishing a quiz-less lesson) means it was watched.
+    if (lmsStatus === "passed" || lmsStatus === "failed" || lmsStatus === "completed") {
+      state.watched = true;
     } else {
       ScormShim.setIncomplete();
       ScormShim.commit();
     }
+    // Keep the attempt open so suspend_data survives until the learner passes.
+    ScormShim.onExit(() => {
+      if (licenseExpired) return;
+      const t = currentTime();
+      if (t > 0) state.pos = Math.floor(t);
+      ScormShim.setSuspendData(JSON.stringify(state));
+      ScormShim.setExit(lmsStatus === "passed" ? "normal" : "suspend");
+    });
   }
 
-  function scormSavePos(sec) {
-    if (!ScormShim.isActive() || scormCompleted || licenseExpired) return;
+  function currentTime() {
+    if (videoPlayer) return videoPlayer.currentTime || 0;
+    if (youtubePlayer && youtubePlayer.getCurrentTime) return youtubePlayer.getCurrentTime() || 0;
+    return 0;
+  }
+
+  function savePos(sec) {
     const floored = Math.floor(sec);
-    if (floored - lastSavedSec < SAVE_EVERY_SEC) return;
+    if (Math.abs(floored - lastSavedSec) < SAVE_EVERY_SEC) return;
     lastSavedSec = floored;
-    ScormShim.setSuspendData(JSON.stringify({ v: 1, pos: floored }));
-    ScormShim.commit();
+    state.pos = floored;
+    saveState();
   }
 
-  function scormLoadPos() {
-    if (!ScormShim.isActive()) return 0;
+  /* ── First-viewing gate ─────────────────────────────────────── */
+  let lastTime = 0;
+
+  function canReach(sec) {
+    return state.watched || sec <= state.maxw + 1;
+  }
+
+  function trackProgress(t) {
+    // Only normal playback moves the limit forward; a jump does not.
+    if (t > state.maxw && t - lastTime <= PLAY_STEP_MAX_SEC) state.maxw = t;
+    lastTime = t;
+  }
+
+  function flashNotice() {
+    if (state.watched || !hasQuiz) return;
+    watchNotice.classList.add("flash");
+    setTimeout(() => watchNotice.classList.remove("flash"), 1200);
+  }
+
+  function updateLocks() {
+    sectionList.querySelectorAll("a[data-start]").forEach((link) => {
+      link.classList.toggle("locked", !canReach(parseFloat(link.dataset.start)));
+    });
+    const quizLink = document.getElementById("quiz-link");
+    if (quizLink) quizLink.classList.toggle("locked", !state.watched);
+  }
+
+  function exitFullscreen() {
     try {
-      const raw = ScormShim.getSuspendData();
-      if (!raw) return 0;
-      const d = JSON.parse(raw);
-      return (d.v === 1 && d.pos > 0) ? d.pos : 0;
-    } catch (e) { return 0; }
+      if (document.fullscreenElement) document.exitFullscreen();
+      else if (videoPlayer && videoPlayer.webkitDisplayingFullscreen) videoPlayer.webkitExitFullscreen();
+    } catch (e) {}
   }
 
-  function scormComplete() {
-    if (!ScormShim.isActive() || scormCompleted || licenseExpired) return;
-    scormCompleted = true;
-    ScormShim.setSuspendData('');
-    ScormShim.setCompleted();
-    ScormShim.commit();
+  function onVideoFinished(duration) {
+    if (licenseExpired) return;
+    if (!state.watched && !(duration && state.maxw >= duration - END_TOLERANCE_SEC)) return;
+    const firstTime = !state.watched;
+    state.watched = true;
+    watchNotice.classList.add("hidden");
+    updateLocks();
+    if (!hasQuiz) {
+      if (ScormShim.isActive() && lmsStatus !== "completed") {
+        lmsStatus = "completed";
+        ScormShim.setCompleted();
+      }
+      saveState();
+      return;
+    }
+    saveState();
+    revealQuiz(firstTime);
   }
 
+  function revealQuiz(scrollTo) {
+    if (!hasQuiz || licenseExpired) return;
+    const section = document.getElementById("quiz-section");
+    const wasHidden = section.classList.contains("hidden");
+    section.classList.remove("hidden");
+    if (wasHidden) startQuiz();
+    if (scrollTo) {
+      exitFullscreen();
+      section.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("quiz-heading").focus({ preventScroll: true });
+    }
+  }
+
+  /* ── Quiz ────────────────────────────────────────────────── */
+  let current = 0;
+  let answers = [];   // chosen option index for each answered question
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function optionsFor(q) {
+    return (q.type === "true_false") ? ["True", "False"] : (q.options || []);
+  }
+
+  function correctStr(q) {
+    if (q.type === "true_false") {
+      return (q.answer === true || q.answer === "True") ? "True" : "False";
+    }
+    return String(q.answer);
+  }
+
+  function isRight(i) {
+    const q = quizData[i];
+    return optionsFor(q)[answers[i]] === correctStr(q);
+  }
+
+  function score() {
+    return answers.filter((_, i) => isRight(i)).length;
+  }
+
+  function saveQuiz() {
+    state.quiz = { cur: current, ans: answers.slice() };
+    saveState();
+  }
+
+  function startQuiz() {
+    const saved = state.quiz;
+    if (saved && Array.isArray(saved.ans) && saved.ans.length <= quizData.length) {
+      answers = saved.ans.slice();
+      current = answers.length;   // resume at the first unanswered question
+    }
+    if (current >= quizData.length && answers.length) showResults();
+    else showQuestion();
+  }
+
+  function showQuestion() {
+    const q = quizData[current];
+    const pct = Math.round((current / quizData.length) * 100);
+    const optionsHtml = optionsFor(q).map((opt, i) =>
+      '<label class="option">' +
+        '<input type="radio" name="answer" value="' + i + '">' +
+        '<span>' + esc(opt) + '</span>' +
+      '</label>'
+    ).join("");
+
+    document.getElementById("question-view").innerHTML =
+      '<div class="progress-label">Question ' + (current + 1) + ' of ' + quizData.length + '</div>' +
+      '<div class="progress-track"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
+      '<p class="question-text">' + esc(q.prompt) + '</p>' +
+      '<div class="options">' + optionsHtml + '</div>' +
+      '<div id="feedback" class="hidden"></div>' +
+      '<div class="btn-row">' +
+        '<button id="submit-btn" onclick="submitAnswer()">Submit Answer</button>' +
+        '<button id="next-btn" class="hidden" onclick="nextQuestion()">' +
+          (current + 1 < quizData.length ? "Next Question" : "See Results") +
+        '</button>' +
+      '</div>';
+
+    document.getElementById("question-view").classList.remove("hidden");
+    document.getElementById("results-view").classList.add("hidden");
+  }
+
+  function submitAnswer() {
+    const q = quizData[current];
+    const selected = document.querySelector('input[name="answer"]:checked');
+    if (!selected) { alert("Please select an answer."); return; }
+
+    const opts = optionsFor(q);
+    const choice = parseInt(selected.value, 10);
+    answers[current] = choice;
+    const userAnswer = opts[choice];
+    const correctAnswer = correctStr(q);
+    const ok = isRight(current);
+
+    ScormShim.recordInteraction(current, "Q" + (current + 1), userAnswer, correctAnswer, ok);
+
+    document.querySelectorAll('input[name="answer"]').forEach((r) => { r.disabled = true; });
+    document.querySelectorAll("#question-view .option").forEach((label) => {
+      const val = opts[parseInt(label.querySelector("input").value, 10)];
+      if (val === correctAnswer) label.classList.add("correct");
+      else if (val === userAnswer && !ok) label.classList.add("incorrect");
+    });
+
+    const fb = document.getElementById("feedback");
+    fb.className = "feedback " + (ok ? "correct-fb" : "incorrect-fb");
+    fb.innerHTML =
+      '<div class="feedback-header ' + (ok ? "correct" : "incorrect") + '">' +
+        (ok ? "&#10003; Correct!"
+            : "&#10007; Incorrect — the correct answer is: <em>" + esc(correctAnswer) + "</em>") +
+      '</div>' +
+      (q.explanation ? '<p class="explanation">' + esc(q.explanation) + '</p>' : "");
+
+    saveQuiz();
+    document.getElementById("submit-btn").classList.add("hidden");
+    document.getElementById("next-btn").classList.remove("hidden");
+  }
+
+  function nextQuestion() {
+    current++;
+    saveQuiz();
+    if (current < quizData.length) showQuestion();
+    else showResults();
+  }
+
+  function showResults() {
+    if (isExpired()) { showLicenseExpired(); return; }  // never certify once expired
+    const correct = score();
+    const percent = Math.round((correct / quizData.length) * 100);
+    const passed = percent >= PASS_PERCENT;
+
+    if (ScormShim.isActive()) {
+      // A retake never downgrades a pass already recorded.
+      if (passed || lmsStatus !== "passed") {
+        ScormShim.setResult(passed, percent);
+        lmsStatus = passed ? "passed" : "failed";
+      }
+      state.quiz = null;
+      saveState();
+    }
+
+    if (passed) {
+      renderCertificate({
+        learnerName: formatLearnerName(ScormShim.getLearnerName()),
+        courseTitle: courseTitle,
+        scorePercent: percent,
+        dateStr: new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
+      });
+    }
+
+    let reviewHtml;
+    if (answers.every((_, i) => isRight(i))) {
+      reviewHtml = '<p class="all-correct">&#10003; You got every question right!</p>';
+    } else {
+      let items = "";
+      quizData.forEach((q, i) => {
+        if (isRight(i)) return;
+        items +=
+          '<div class="review-item">' +
+            '<div class="review-num">&#10007; Question ' + (i + 1) + '</div>' +
+            '<p class="review-question">' + esc(q.prompt) + '</p>' +
+            '<p class="review-answer"><strong>Your answer:</strong> ' + esc(optionsFor(q)[answers[i]]) + '</p>' +
+            '<p class="review-answer"><strong>Correct answer:</strong> ' + esc(correctStr(q)) + '</p>' +
+            (q.explanation ? '<p class="review-expl">' + esc(q.explanation) + '</p>' : "") +
+          '</div>';
+      });
+      reviewHtml =
+        '<h3 class="review-heading">Review your incorrect answers</h3>' +
+        '<div class="review-list">' + items + '</div>';
+    }
+
+    document.getElementById("question-view").classList.add("hidden");
+    const results = document.getElementById("results-view");
+    results.classList.remove("hidden");
+    results.innerHTML =
+      '<div class="score-display ' + (passed ? "passed" : "failed") + '">' +
+        '<div class="score-number">' + percent + '%</div>' +
+        '<div class="score-label">' + (passed ? "&#10003; Passed" : "&#10007; Not yet passed") + '</div>' +
+        '<div class="score-sub">' + correct + ' of ' + quizData.length + ' correct' +
+          (!passed ? " &mdash; " + PASS_PERCENT + "% required to pass" : "") +
+        '</div>' +
+      '</div>' +
+      reviewHtml +
+      (passed ? '<button class="retry-btn" onclick="showCertificate()">View / Print Certificate</button> ' : "") +
+      '<button class="retry-btn" onclick="retryQuiz()">Retry Quiz</button>';
+  }
+
+  function retryQuiz() {
+    current = 0;
+    answers = [];
+    document.getElementById("certificate-view").classList.add("hidden");
+    saveQuiz();
+    showQuestion();
+  }
+
+  /* ── Page setup ─────────────────────────────────────────────── */
   scormInit();
 
   if (isExpired()) {
@@ -252,7 +625,7 @@
     isYouTube = true;
     const videoId = videoUrl.split("v=")[1] || videoUrl.split("/").pop();
     const iframe = document.createElement("iframe");
-    iframe.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1`;
+    iframe.src = `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?enablejsapi=1`;
     iframe.id = "youtube-player";
     iframe.allow = "autoplay; encrypted-media";
     iframe.allowFullscreen = true;
@@ -276,34 +649,63 @@
     transcriptTable.appendChild(row);
   });
 
+  function seekTo(sec) {
+    if (isYouTube && youtubePlayer) {
+      youtubePlayer.seekTo(sec, true);
+      youtubePlayer.playVideo();
+    } else if (videoPlayer) {
+      videoPlayer.currentTime = sec;
+      videoPlayer.play();
+    }
+  }
+
   sections.forEach((sec, idx) => {
     const li = document.createElement("li");
     const link = document.createElement("a");
     link.textContent = `${idx + 1}. ${sec.title}`;
+    link.dataset.start = sec.start_seconds;
     link.addEventListener("click", (e) => {
       e.preventDefault();
-      if (isYouTube && youtubePlayer) {
-        youtubePlayer.seekTo(sec.start_seconds, true);
-        youtubePlayer.playVideo();
-      } else if (videoPlayer) {
-        videoPlayer.currentTime = sec.start_seconds;
-        videoPlayer.play();
-      }
+      if (!canReach(sec.start_seconds)) { flashNotice(); return; }
+      seekTo(sec.start_seconds);
     });
     li.appendChild(link);
     sectionList.appendChild(li);
   });
 
-  function highlightTranscript(currentTime) {
+  if (hasQuiz) {
+    const li = document.createElement("li");
+    const link = document.createElement("a");
+    link.id = "quiz-link";
+    link.textContent = "Quiz";
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (!state.watched) { flashNotice(); return; }
+      revealQuiz(true);
+    });
+    li.appendChild(link);
+    sectionList.appendChild(li);
+    if (state.watched) revealQuiz(false);
+    else watchNotice.classList.remove("hidden");
+  }
+  updateLocks();
+
+  function highlightTranscript(t) {
     const rows = transcriptTable.querySelectorAll("tr");
     rows.forEach((row) => row.classList.remove("active"));
     for (let i = 0; i < rows.length; i++) {
-      const start = parseFloat(rows[i].getAttribute("data-start"));
-      if (currentTime >= start) {
-        rows[i].classList.add("active");
-      }
+      if (t >= parseFloat(rows[i].getAttribute("data-start"))) rows[i].classList.add("active");
     }
   }
+
+  function onTick(t) {
+    trackProgress(t);
+    highlightTranscript(t);
+    savePos(t);
+    updateLocks();
+  }
+
+  const resumeAt = Math.min(state.pos, state.watched ? Infinity : state.maxw);
 
   if (videoPlayer) {
     /* Load failure (e.g. a signed URL the LMS blocks outright) — same
@@ -311,25 +713,34 @@
        completion/progress once shown. */
     videoPlayer.addEventListener("error", () => showLicenseExpired(), { once: true });
 
-    /* Seek to saved position once the video is seekable. */
-    videoPlayer.addEventListener("canplay", () => {
-      const saved = scormLoadPos();
-      if (saved > 0) videoPlayer.currentTime = saved;
+    videoPlayer.addEventListener("loadedmetadata", () => {
+      if (resumeAt > 0) {
+        lastTime = resumeAt;
+        videoPlayer.currentTime = resumeAt;
+      }
     }, { once: true });
 
-    videoPlayer.addEventListener("timeupdate", () => {
-      if (licenseExpired) return;
-      const t = videoPlayer.currentTime;
-      highlightTranscript(t);
-      scormSavePos(t);
-      if (!scormCompleted && videoPlayer.duration &&
-          t / videoPlayer.duration >= 0.8) {
-        scormComplete();
+    videoPlayer.addEventListener("seeking", () => {
+      if (!canReach(videoPlayer.currentTime)) {
+        videoPlayer.currentTime = state.maxw;
+        flashNotice();
       }
     });
 
+    videoPlayer.addEventListener("ratechange", () => {
+      if (!state.watched && videoPlayer.playbackRate > MAX_FIRST_VIEW_RATE) {
+        videoPlayer.playbackRate = MAX_FIRST_VIEW_RATE;
+      }
+    });
+
+    videoPlayer.addEventListener("timeupdate", () => {
+      if (licenseExpired || videoPlayer.seeking) return;
+      onTick(videoPlayer.currentTime);
+    });
+
     videoPlayer.addEventListener("ended", () => {
-      if (!licenseExpired) scormComplete();
+      trackProgress(videoPlayer.currentTime);
+      onVideoFinished(videoPlayer.duration);
     });
   }
 
@@ -342,18 +753,29 @@
       youtubePlayer = new YT.Player("youtube-player", {
         events: {
           onReady: () => {
-            const saved = scormLoadPos();
-            if (saved > 0) youtubePlayer.seekTo(saved, true);
-          },
-          onStateChange: () => {
+            if (resumeAt > 0) {
+              lastTime = resumeAt;
+              youtubePlayer.seekTo(resumeAt, true);
+            }
             setInterval(() => {
-              if (!youtubePlayer || !youtubePlayer.getCurrentTime) return;
+              if (!youtubePlayer.getCurrentTime || licenseExpired) return;
               const t = youtubePlayer.getCurrentTime();
-              highlightTranscript(t);
-              scormSavePos(t);
-              const dur = youtubePlayer.getDuration ? youtubePlayer.getDuration() : 0;
-              if (!scormCompleted && dur && t / dur >= 0.8) scormComplete();
+              if (!canReach(t)) {
+                youtubePlayer.seekTo(state.maxw, true);
+                flashNotice();
+                return;
+              }
+              if (!state.watched && youtubePlayer.getPlaybackRate() > MAX_FIRST_VIEW_RATE) {
+                youtubePlayer.setPlaybackRate(MAX_FIRST_VIEW_RATE);
+              }
+              onTick(t);
             }, 500);
+          },
+          onStateChange: (e) => {
+            if (e.data === YT.PlayerState.ENDED) {
+              trackProgress(youtubePlayer.getCurrentTime());
+              onVideoFinished(youtubePlayer.getDuration());
+            }
           }
         }
       });

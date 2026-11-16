@@ -14,19 +14,35 @@ from .scorm_packager import MANIFEST_NAME, manifest_files
 from .video_processing import download_for_embed, embedded_video_name
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
-QUIZ_HTML_NAME = "quiz.html"
+QUIZ_HTML_NAME = "quiz.html"  # the old separate quiz page; no longer built
 QUIZ_JSON_NAME = "quiz.json"
 BRANDING_NAME = "branding.css"
 SCORM_SHIM_NAME = "scorm-shim.js"
 
 VIDEO_MODES = ("embed", "url", "youtube")
 
-# Files each SCO needs, as listed in imsmanifest.xml. The packager zips exactly
-# what the manifest lists, so these lists are the package allowlist.
-# quiz.json is not shipped: its questions are copied into quiz.html at build
-# time and the page never reads the file. It stays in the build folder for editing.
+# Files the lesson SCO needs, as listed in imsmanifest.xml. The packager zips
+# exactly what the manifest lists, so this list is the package allowlist.
+# The quiz lives inside index.html (one SCO), so the quiz can stay locked until
+# the video has been watched. quiz.json is not shipped: its questions are copied
+# into index.html at build time. It stays in the build folder for editing.
 PLAYER_FILES = ("index.html", BRANDING_NAME, SCORM_SHIM_NAME)
-QUIZ_FILES = (QUIZ_HTML_NAME, BRANDING_NAME, SCORM_SHIM_NAME)
+
+_PLACEHOLDER = re.compile(r"\{\{([A-Z_]+)\}\}")
+
+
+def _fill(template: str, values: dict) -> str:
+    """Replace every {{NAME}} in one pass.
+
+    Inserted text is never scanned again, so a title or transcript line that
+    happens to contain "{{VIDEO}}" is shown as typed instead of substituted.
+    """
+    def sub(match):
+        name = match.group(1)
+        if name not in values:
+            raise KeyError(f"Template placeholder {{{{{name}}}}} has no value")
+        return values[name]
+    return _PLACEHOLDER.sub(sub, template)
 
 def _html_text(value: str) -> str:
     """Escape a user-supplied value for HTML text or a quoted attribute."""
@@ -71,7 +87,11 @@ def generate_player_html(
     video_expiry: str | None = None,
     license_message: str | None = None,
 ) -> Path:
-    """Render the video player HTML into output_dir/index.html.
+    """Render the lesson page (video player + quiz) into output_dir/index.html.
+
+    If output_dir/quiz.json exists, its questions are built into the page. The
+    quiz stays hidden until the learner has watched the whole video once; on
+    that first viewing they cannot skip ahead or play faster than 2x.
 
     video_mode:
       "embed"   — video is copied (local path) or downloaded (http(s) URL)
@@ -110,55 +130,42 @@ def generate_player_html(
 
     expiry_value = video_expiry if (video_mode == "url" and video_expiry) else ""
 
-    html = (
-        template
-        .replace("{{TRANSCRIPT_JSON}}", _script_json(transcript))
-        .replace("{{SECTIONS_JSON}}", _script_json(sections))
-        .replace("{{TITLE}}", _html_text(title))
-        .replace("{{VIDEO}}", video_value)
-        .replace("{{VIDEO_TYPE}}", video_type)
-        .replace("{{VIDEO_EXPIRY}}", expiry_value)
-        .replace("{{LICENSE_MESSAGE_JSON}}", _script_json(license_message or DEFAULT_LICENSE_MESSAGE))
-    )
+    quiz_json_path = output_dir / QUIZ_JSON_NAME
+    quiz_data = load_quiz_data(quiz_json_path) if quiz_json_path.exists() else {"questions": []}
+
+    html = _fill(template, {
+        "TITLE": _html_text(title),
+        "TITLE_JSON": _script_json(title),
+        "TRANSCRIPT_JSON": _script_json(transcript),
+        "SECTIONS_JSON": _script_json(sections),
+        "QUIZ_JSON": _script_json(quiz_data),
+        "VIDEO_ATTR": _html_text(video_value),
+        "VIDEO_JSON": _script_json(video_value),
+        "VIDEO_TYPE": video_type,
+        "VIDEO_EXPIRY": expiry_value,
+        "LICENSE_MESSAGE_JSON": _script_json(license_message or DEFAULT_LICENSE_MESSAGE),
+        "CERTIFICATE_PARTIAL": (TEMPLATE_DIR / "certificate_partial.html").read_text(encoding="utf-8"),
+    })
 
     out = output_dir / "index.html"
     out.write_text(html, encoding="utf-8")
+    # A quiz.html left by an older build would be a second, ungated copy of the
+    # quiz when previewing locally. It is never packaged; remove it anyway.
+    (output_dir / QUIZ_HTML_NAME).unlink(missing_ok=True)
     return out
 
 
-def generate_quiz_html(
-    output_dir: Path,
-    title: str,
-    video_expiry: str | None = None,
-    license_message: str | None = None,
-) -> Path:
-    """Render the quiz player HTML into output_dir/quiz.html.
-
-    video_expiry mirrors generate_player_html's Type-1 kill switch: if the
-    paired video's license has expired, the quiz also refuses to show
-    results/certificate or report a pass to the LMS, so a learner can't
-    bypass an expired video and still certify.
-    """
-    template = (TEMPLATE_DIR / "quiz_template.html").read_text(encoding="utf-8")
-    shutil.copy(TEMPLATE_DIR / BRANDING_NAME, output_dir / BRANDING_NAME)
-    shutil.copy(TEMPLATE_DIR / SCORM_SHIM_NAME, output_dir / SCORM_SHIM_NAME)
-
-    quiz_json_path = output_dir / QUIZ_JSON_NAME
-    quiz_data = "{}" if not quiz_json_path.exists() else quiz_json_path.read_text(encoding="utf-8")
-    certificate_partial = (TEMPLATE_DIR / "certificate_partial.html").read_text(encoding="utf-8")
-
-    html = (
-        template
-        .replace("{{TITLE_JSON}}", _script_json(title))
-        .replace("{{TITLE}}", _html_text(title))
-        .replace("{{QUIZ_DATA}}", _script_safe(quiz_data))
-        .replace("{{VIDEO_EXPIRY}}", video_expiry or "")
-        .replace("{{LICENSE_MESSAGE_JSON}}", _script_json(license_message or DEFAULT_LICENSE_MESSAGE))
-        .replace("{{CERTIFICATE_PARTIAL}}", certificate_partial)
-    )
-    out = output_dir / QUIZ_HTML_NAME
-    out.write_text(html, encoding="utf-8")
-    return out
+def load_quiz_data(path: Path) -> dict:
+    """Read quiz.json, with a plain-English error if it isn't valid JSON."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"{path.name} has a typo on line {exc.lineno}, column {exc.colno}: {exc.msg}"
+        ) from exc
+    if not isinstance(data, dict) or not isinstance(data.get("questions", []), list):
+        raise ValueError(f'{path.name} must look like {{"questions": [ ... ]}}')
+    return data
 
 
 # (prefix, namespace URI, schema file) — prefix None means the default xmlns.
@@ -231,9 +238,9 @@ def manifest_extra_files(output_dir: Path) -> List[str]:
     path = output_dir / MANIFEST_NAME
     if not path.is_file():
         return []
-    # quiz.json counts as standard so a manifest written before it was dropped
-    # from QUIZ_FILES doesn't carry it forward as an "extra" file.
-    standard = set(PLAYER_FILES) | set(QUIZ_FILES) | {QUIZ_JSON_NAME}
+    # quiz.html and quiz.json count as standard so a manifest from an older
+    # build (separate quiz page) doesn't carry them forward as "extra" files.
+    standard = set(PLAYER_FILES) | {QUIZ_HTML_NAME, QUIZ_JSON_NAME}
     return [name for name in manifest_files(path) if name not in standard]
 
 
@@ -245,6 +252,9 @@ def generate_manifest(
     extra_files: Sequence[str] = (),
 ) -> Path:
     """Write an imsmanifest.xml SCORM manifest (1.2 or 2004) into output_dir.
+
+    The lesson is one SCO (index.html holds the video and the quiz).
+    include_quiz adds the 80% mastery score for SCORM 1.2.
 
     extra_files are added to the lesson resource, e.g. the video in embed mode.
     Every file the package will contain is listed here; the packager zips
@@ -274,21 +284,10 @@ def generate_manifest(
     xmlns_block = "\n".join(xmlns_lines)
     schema_location = "\n                      ".join(schema_pairs)
 
-    quiz_items = ""
-    quiz_resources = ""
-    if include_quiz:
-        masteryscore_line = "        <adlcp:masteryscore>80</adlcp:masteryscore>\n" if cfg["masteryscore"] else ""
-        quiz_items = (
-            f'      <item identifier="QUIZ1" identifierref="RESQ1">\n'
-            f'        <title>Quiz</title>\n'
-            f'{masteryscore_line}'
-            f'      </item>\n'
-        )
-        quiz_resources = (
-            f'    <resource identifier="RESQ1" type="webcontent" {sco_attr}="sco" href="{QUIZ_HTML_NAME}">\n'
-            f'{_file_lines(QUIZ_FILES)}'
-            f'    </resource>\n'
-        )
+    masteryscore_line = (
+        "        <adlcp:masteryscore>80</adlcp:masteryscore>\n"
+        if include_quiz and cfg["masteryscore"] else ""
+    )
 
     manifest = f"""<?xml version="1.0" encoding="UTF-8"?>
 <manifest identifier="{identifier}" version="1.0"
@@ -304,13 +303,13 @@ def generate_manifest(
       <title>{title_xml}</title>
       <item identifier="ITEM1" identifierref="RES1">
         <title>{title_xml}</title>
-      </item>
-{quiz_items}    </organization>
+{masteryscore_line}      </item>
+    </organization>
   </organizations>
   <resources>
     <resource identifier="RES1" type="webcontent" {sco_attr}="sco" href="index.html">
 {_file_lines(list(PLAYER_FILES) + list(extra_files))}    </resource>
-{quiz_resources}  </resources>
+  </resources>
 </manifest>"""
 
     out = output_dir / "imsmanifest.xml"

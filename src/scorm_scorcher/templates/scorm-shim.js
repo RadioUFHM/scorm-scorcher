@@ -137,9 +137,27 @@ var ScormShim = (function () {
     set(b + 'weighting', b + 'weighting', '1');
   }
 
-  window.addEventListener('beforeunload', function () {
-    if (api) terminate();
-  });
+  /* 'suspend' keeps the attempt (and suspend_data) for the next launch;
+     'normal' ends it. SCORM 1.2 has no 'normal' value: '' means the same. */
+  function setExit(mode) {
+    if (version === '2004') set('', 'cmi.exit', mode);
+    else set('cmi.core.exit', '', mode === 'suspend' ? 'suspend' : '');
+  }
+
+  var exitHandlers = [];
+  function onExit(fn) { exitHandlers.push(fn); }
+
+  var terminated = false;
+  function finish() {
+    if (!api || terminated) return;
+    terminated = true;
+    exitHandlers.forEach(function (fn) { try { fn(); } catch (e) {} });
+    commit();
+    terminate();
+  }
+
+  window.addEventListener('beforeunload', finish);
+  window.addEventListener('pagehide', finish);
 
   return {
     init: init,
@@ -156,6 +174,8 @@ var ScormShim = (function () {
     setIncomplete: setIncomplete,
     setCompleted: setCompleted,
     setResult: setResult,
-    recordInteraction: recordInteraction
+    recordInteraction: recordInteraction,
+    setExit: setExit,
+    onExit: onExit
   };
 })();

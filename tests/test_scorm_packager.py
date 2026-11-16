@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from scorm_scorcher.builder import PLAYER_FILES, QUIZ_FILES, generate_manifest
+from scorm_scorcher.builder import PLAYER_FILES, generate_manifest
 from scorm_scorcher.scorm_packager import create_scorm_package, manifest_files
 
 WORKING_FILES = [
@@ -29,7 +29,7 @@ WORKING_FILES = [
 def _make_build_dir(tmp_path: Path, include_quiz: bool = True, extra_files=()) -> Path:
     build = tmp_path / "build"
     build.mkdir()
-    names = set(PLAYER_FILES) | (set(QUIZ_FILES) if include_quiz else set()) | set(extra_files)
+    names = set(PLAYER_FILES) | set(extra_files)
     for name in names:
         (build / name).write_text("x", encoding="utf-8")
     generate_manifest("Lesson", build, include_quiz=include_quiz, extra_files=list(extra_files))

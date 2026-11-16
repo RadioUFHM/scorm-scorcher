@@ -9,11 +9,9 @@ from pathlib import Path
 import click
 
 from .builder import (
-    QUIZ_HTML_NAME,
     QUIZ_JSON_NAME,
     generate_manifest,
     generate_player_html,
-    generate_quiz_html,
     manifest_extra_files,
     package_basename,
 )
@@ -81,11 +79,11 @@ def _package_scorm_versions(
     title: str, out_dir: Path, scorm: str, extra_files: list[str] | None = None,
 ) -> list[Path]:
     """Regenerate imsmanifest.xml for each requested SCORM version and zip
-    immediately after each regeneration. Cheap because index.html/quiz.html/
+    immediately after each regeneration. Cheap because index.html and its
     assets are built once and reused unchanged across every version — only
     the manifest differs."""
     versions = ["1.2", "2004"] if scorm == "both" else [scorm]
-    quiz_exists = (out_dir / QUIZ_HTML_NAME).exists()
+    quiz_exists = (out_dir / QUIZ_JSON_NAME).exists()
     if extra_files is None:  # 'package' alone: keep what 'build' listed, e.g. the video
         extra_files = manifest_extra_files(out_dir)
     multi = len(versions) > 1
@@ -275,10 +273,6 @@ def build(
 
         quiz_exists = (out_dir / QUIZ_JSON_NAME).exists()
 
-        if quiz_exists:
-            generate_quiz_html(out_dir, title, effective_expiry, license_message)
-            click.echo(f"Quiz page:  {out_dir / QUIZ_HTML_NAME}")
-
         html_path = generate_player_html(
             transcript, sections, title, out_dir, video, resolved_mode,
             effective_expiry, license_message,
@@ -288,11 +282,11 @@ def build(
             extra_files=_embedded_files(video, resolved_mode),
         )
 
-        click.echo(f"Player:     {html_path}")
+        click.echo(f"Player:     {html_path}" + ("  (with quiz)" if quiz_exists else ""))
         click.echo(f"Manifest:   {manifest_path}")
         click.echo("Build complete. Run 'package' to create the SCORM zip.")
 
-    except (FileNotFoundError, RuntimeError) as exc:
+    except (FileNotFoundError, RuntimeError, ValueError) as exc:
         raise click.ClickException(str(exc))
 
 
@@ -448,11 +442,6 @@ def run_pipeline(
 
         # ── 3 / 4  BUILD ─────────────────────────────────────────────────
         click.echo("\n[3/4] Building SCORM assets…")
-        quiz_exists = quiz_path.exists()
-
-        if quiz_exists:
-            generate_quiz_html(out_dir, title, effective_expiry, license_message)
-
         html_path = generate_player_html(
             transcript, sections, title, out_dir, video, resolved_mode,
             effective_expiry, license_message,

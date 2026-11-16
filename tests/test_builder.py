@@ -16,7 +16,7 @@ from scorm_scorcher.builder import (
     SCORM_SHIM_NAME,
     generate_manifest,
     generate_player_html,
-    generate_quiz_html,
+    load_quiz_data,
 )
 
 TRANSCRIPT = [{"index": 1, "start": "00:00:01,000", "end": "00:00:03,000", "start_seconds": 1, "text": "Hello"}]
@@ -106,49 +106,94 @@ def test_generate_player_html_default_license_message(tmp_path):
     assert "This training license has expired" in content
 
 
-def test_generate_quiz_html(tmp_path):
-    quiz_data = {"questions": [{"type": "true_false", "prompt": "True?", "answer": True}]}
-    (tmp_path / QUIZ_JSON_NAME).write_text(json.dumps(quiz_data), encoding="utf-8")
-    out = generate_quiz_html(tmp_path, "My Quiz")
-    assert out.exists()
-    content = out.read_text(encoding="utf-8")
+QUIZ = {"questions": [{"type": "true_false", "prompt": "True?", "answer": True}]}
+
+
+def _lesson_with_quiz(tmp_path, quiz=QUIZ, title="My Quiz", **kwargs):
+    (tmp_path / QUIZ_JSON_NAME).write_text(json.dumps(quiz), encoding="utf-8")
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"")
+    return generate_player_html(TRANSCRIPT, SECTIONS, title, tmp_path, str(video), video_mode="embed", **kwargs)
+
+
+def test_lesson_page_includes_quiz(tmp_path):
+    content = _lesson_with_quiz(tmp_path).read_text(encoding="utf-8")
     assert "My Quiz" in content
     assert "True?" in content
+    assert 'id="quiz-section"' in content
     assert (tmp_path / SCORM_SHIM_NAME).exists()
     assert "This training license has expired" in content
 
 
-def test_generate_quiz_html_includes_certificate(tmp_path):
-    quiz_data = {"questions": [{"type": "true_false", "prompt": "True?", "answer": True}]}
-    (tmp_path / QUIZ_JSON_NAME).write_text(json.dumps(quiz_data), encoding="utf-8")
-    out = generate_quiz_html(tmp_path, "My Quiz")
-    content = out.read_text(encoding="utf-8")
+def test_lesson_page_without_quiz_json_has_no_questions(tmp_path):
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"")
+    content = generate_player_html(
+        TRANSCRIPT, SECTIONS, "T", tmp_path, str(video), video_mode="embed"
+    ).read_text(encoding="utf-8")
+    assert 'const quizData = ({"questions": []}.questions || []);' in content
+
+
+def test_lesson_page_includes_certificate(tmp_path):
+    content = _lesson_with_quiz(tmp_path).read_text(encoding="utf-8")
     assert 'id="certificate-view"' in content
     assert "renderCertificate" in content
     assert "window.print()" in content
 
 
-def test_generate_quiz_html_with_expiry(tmp_path):
-    quiz_data = {"questions": [{"type": "true_false", "prompt": "True?", "answer": True}]}
-    (tmp_path / QUIZ_JSON_NAME).write_text(json.dumps(quiz_data), encoding="utf-8")
-    out = generate_quiz_html(tmp_path, "My Quiz", video_expiry="2020-01-01", license_message="Renew now.")
-    content = out.read_text(encoding="utf-8")
-    assert "2020-01-01" in content
+def test_certificate_is_a_direct_child_of_body_for_printing(tmp_path):
+    # The print CSS hides "body > *:not(#certificate-view)".
+    content = _lesson_with_quiz(tmp_path).read_text(encoding="utf-8")
+    body = content[content.index("<body>"):]
+    before = body[:body.index('<div id="certificate-view"')]
+    assert before.count("<section") == before.count("</section>")
+    assert before.count("<main") == before.count("</main>")
+
+
+def test_lesson_page_with_expiry_in_url_mode(tmp_path):
+    (tmp_path / QUIZ_JSON_NAME).write_text(json.dumps(QUIZ), encoding="utf-8")
+    content = generate_player_html(
+        TRANSCRIPT, SECTIONS, "T", tmp_path, "https://cdn.example.com/v.mp4", video_mode="url",
+        video_expiry="2020-01-01", license_message="Renew now.",
+    ).read_text(encoding="utf-8")
+    assert '"2020-01-01"' in content
     assert "Renew now." in content
+
+
+def test_build_removes_stale_quiz_page(tmp_path):
+    (tmp_path / QUIZ_HTML_NAME).write_text("old ungated quiz", encoding="utf-8")
+    _lesson_with_quiz(tmp_path)
+    assert not (tmp_path / QUIZ_HTML_NAME).exists()
+
+
+def test_invalid_quiz_json_gives_line_number(tmp_path):
+    path = tmp_path / QUIZ_JSON_NAME
+    path.write_text('{"questions": [\n  {"prompt": "x",}\n]}', encoding="utf-8")
+    with pytest.raises(ValueError, match="line 2"):
+        load_quiz_data(path)
+
+
+def test_title_placeholder_text_is_not_substituted(tmp_path):
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"")
+    page = _read_page(generate_player_html(
+        TRANSCRIPT, SECTIONS, "Use {{VIDEO_ATTR}} here", tmp_path, str(video), video_mode="embed",
+    ))
+    assert page.title == "Use {{VIDEO_ATTR}} here"
 
 
 def test_generate_manifest_no_quiz(tmp_path):
     manifest = generate_manifest("My Lesson", tmp_path, include_quiz=False)
     content = manifest.read_text(encoding="utf-8")
     assert "MY_LESSON_SCORM" in content
-    assert "SCORM" in content
+    assert "masteryscore" not in content
     assert QUIZ_HTML_NAME not in content
 
 
 def test_generate_manifest_with_quiz(tmp_path):
     manifest = generate_manifest("My Lesson", tmp_path, include_quiz=True)
     content = manifest.read_text(encoding="utf-8")
-    assert QUIZ_HTML_NAME in content
+    assert QUIZ_HTML_NAME not in content  # the quiz is inside index.html
     assert "masteryscore" in content
 
 
@@ -159,7 +204,7 @@ def test_generate_manifest_2004_no_masteryscore(tmp_path):
     assert "adlseq_v1p3" in content
     assert "2004 4th Edition" in content
     assert "masteryscore" not in content
-    assert QUIZ_HTML_NAME in content
+    assert QUIZ_HTML_NAME not in content
 
 
 def test_generate_manifest_2004_without_quiz(tmp_path):
@@ -199,9 +244,8 @@ def test_manifest_title_round_trips_through_xml_parser(tmp_path, title, version)
     root = ET.parse(path).getroot()  # raises ParseError if the manifest is malformed
 
     titles = [el.text for el in root.iter() if _local(el.tag) == "title"]
-    # Organization title + lesson item title carry the user's title; the quiz item is "Quiz".
-    assert titles.count(title) == 2
-    assert "Quiz" in titles
+    # Organization title + the one lesson item carry the user's title.
+    assert titles == [title, title]
 
 
 @pytest.mark.parametrize("title", SPECIAL_TITLES)
@@ -224,7 +268,7 @@ EXPECTED_ATTR = {"1.2": "scormtype", "2004": "scormType"}
 def test_resource_scormtype_attribute_matches_version(tmp_path, version, include_quiz):
     root = ET.parse(generate_manifest("Lesson", tmp_path, include_quiz=include_quiz, scorm_version=version)).getroot()
     resources = [el for el in root.iter() if _local(el.tag) == "resource"]
-    assert len(resources) == (2 if include_quiz else 1)
+    assert len(resources) == 1  # one SCO: the quiz is inside the lesson page
 
     ns = ADLCP_NS[version]
     for res in resources:
@@ -294,16 +338,14 @@ def test_player_page_shows_title_exactly(tmp_path, title):
 
 
 @pytest.mark.parametrize("title", PAGE_TITLES)
-def test_quiz_page_and_certificate_title_round_trip(tmp_path, title):
-    (tmp_path / QUIZ_JSON_NAME).write_text('{"questions": []}', encoding="utf-8")
-    page = _read_page(generate_quiz_html(tmp_path, title))
-    assert page.title == f"{title} — Quiz"
-    assert title in page.h1
+def test_certificate_title_round_trips(tmp_path, title):
+    page = _read_page(_lesson_with_quiz(tmp_path, title=title))
+    assert page.title == title
 
-    # The certificate's courseTitle must be one valid JS string literal inside
+    # The certificate's course title must be one valid JS string literal inside
     # the script block. A JSON string literal is a valid JS string literal.
     script = "".join(page.scripts)
-    match = re.search(r'courseTitle:\s*("(?:[^"\\]|\\.)*")\s*,', script)
+    match = re.search(r'const courseTitle = ("(?:[^"\\]|\\.)*");', script)
     assert match, "courseTitle not found inside a <script> block"
     assert json.loads(match.group(1)) == title
 
@@ -316,7 +358,7 @@ def test_quiz_manifest_does_not_list_quiz_json(tmp_path):
     for version in ("1.2", "2004"):
         generate_manifest("Lesson", tmp_path, include_quiz=True, scorm_version=version)
         listed = manifest_files(tmp_path / "imsmanifest.xml")
-        assert QUIZ_HTML_NAME in listed
+        assert QUIZ_HTML_NAME not in listed
         assert QUIZ_JSON_NAME not in listed
 
 
@@ -362,18 +404,14 @@ def test_player_page_script_data_is_inert_and_round_trips(tmp_path):
     assert value("licenseMessage") == PAYLOAD
 
 
-def test_quiz_page_script_data_is_inert_and_round_trips(tmp_path):
-    (tmp_path / QUIZ_JSON_NAME).write_text('{"questions": []}', encoding="utf-8")
-    plain = _read_page(generate_quiz_html(tmp_path, "T"))
+def test_quiz_script_data_is_inert_and_round_trips(tmp_path):
+    plain = _read_page(_lesson_with_quiz(tmp_path, quiz={"questions": []}, title="T"))
 
     quiz = {"questions": [{"type": "true_false", "prompt": PAYLOAD, "answer": True}]}
-    (tmp_path / QUIZ_JSON_NAME).write_text(json.dumps(quiz), encoding="utf-8")
-    out = generate_quiz_html(tmp_path, "T", license_message=PAYLOAD)
+    out = _lesson_with_quiz(tmp_path, quiz=quiz, title="T", license_message=PAYLOAD)
     content = out.read_text(encoding="utf-8")
     assert len(_read_page(out).scripts) == len(plain.scripts)
     assert "<script>window.injected" not in content
 
-    data = re.search(r"var quizData = \((.*)\.questions \|\| \[\]\);", content)
+    data = re.search(r"const quizData = \((.*)\.questions \|\| \[\]\);", content)
     assert data and json.loads(data.group(1)) == quiz
-    message = re.search(r"var licenseMessage = (.*);\n", content)
-    assert message and json.loads(message.group(1)) == PAYLOAD
