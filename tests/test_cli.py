@@ -324,3 +324,17 @@ def test_zip_filename_is_safe_for_title(tmp_path, title, zip_name):
     result = runner.invoke(main, ["package", "--input", str(out), "--title", title])
     assert result.exit_code == 0, result.output
     assert sorted(p.name for p in out.glob("*.zip")) == [zip_name]
+
+
+def test_quiz_says_when_no_api_key(tmp_path, monkeypatch):
+    from click.testing import CliRunner
+    from scorm_scorcher.cli import main
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    (tmp_path / "audio.md").write_text(
+        "- [00:00:01,000] The quick brown fox jumps over the lazy dog\n", encoding="utf-8"
+    )
+    result = CliRunner().invoke(main, ["quiz", "--input", str(tmp_path), "--num-questions", "1"])
+    assert result.exit_code == 0, result.output
+    assert "No API key found" in result.output

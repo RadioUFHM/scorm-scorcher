@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
@@ -102,6 +103,19 @@ def _package_scorm_versions(
     return zip_paths
 
 
+def _echo_quiz_source() -> None:
+    """Say which quiz generator will run, so a missing key isn't silent."""
+    if os.getenv("ANTHROPIC_API_KEY"):
+        click.echo("      Using Claude (ANTHROPIC_API_KEY found).")
+    elif os.getenv("OPENAI_API_KEY"):
+        click.echo("      Using OpenAI (OPENAI_API_KEY found).")
+    else:
+        click.echo(
+            "      No API key found: using the built-in fill-in-the-blank quiz. "
+            "Set ANTHROPIC_API_KEY for AI-written questions."
+        )
+
+
 @click.group()
 @click.version_option()
 def main() -> None:
@@ -179,6 +193,7 @@ def quiz(input_dir: str, num_questions: int, xlsx: bool) -> None:
         if not md_files:
             raise FileNotFoundError("No markdown transcript found. Run 'prepare' first.")
 
+        _echo_quiz_source()
         questions = generate_quiz_from_transcript(str(md_files[0]), num_questions)
         quiz_path = out_dir / QUIZ_JSON_NAME
         save_quiz_to_json(questions, str(quiz_path))
@@ -395,6 +410,7 @@ def run_pipeline(
 
         # ── 2 / 4  QUIZ ──────────────────────────────────────────────────
         click.echo("\n[2/4] Generating quiz questions…")
+        _echo_quiz_source()
         questions = generate_quiz_from_transcript(str(md_path), num_questions)
         quiz_path = out_dir / QUIZ_JSON_NAME
         save_quiz_to_json(questions, str(quiz_path))
