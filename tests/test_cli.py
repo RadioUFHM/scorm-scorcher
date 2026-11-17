@@ -338,3 +338,30 @@ def test_quiz_says_when_no_api_key(tmp_path, monkeypatch):
     result = CliRunner().invoke(main, ["quiz", "--input", str(tmp_path), "--num-questions", "1"])
     assert result.exit_code == 0, result.output
     assert "No API key found" in result.output
+
+
+def test_build_with_logo_ships_logo_and_package_keeps_it(tmp_path):
+    build = tmp_path / "b"
+    build.mkdir()
+    (build / "lesson.srt").write_text(SRT, encoding="utf-8")
+    video = tmp_path / "lesson.mp4"
+    video.write_bytes(b"video")
+    logo = tmp_path / "logo.svg"
+    logo.write_text("<svg xmlns='http://www.w3.org/2000/svg'/>", encoding="utf-8")
+
+    runner = CliRunner()
+    result = runner.invoke(main, [
+        "build", "--video", str(video), "--input", str(build), "--title", "L",
+        "--logo", str(logo), "--signer-name", "Rio Miner", "--signer-title", "Principal",
+    ])
+    assert result.exit_code == 0, result.output
+    # Rebuild with no certificate options, then package alone: the logo stays.
+    result = runner.invoke(main, ["build", "--video", str(video), "--input", str(build), "--title", "L"])
+    assert result.exit_code == 0, result.output
+    result = runner.invoke(main, ["package", "--input", str(build), "--title", "L", "--scorm", "both"])
+    assert result.exit_code == 0, result.output
+    for name in ("L_SCORM_12.zip", "L_SCORM_2004.zip"):
+        names = _zip_names(build / name)
+        assert "cert-logo.svg" in names
+        assert "certificate.json" not in names
+    assert "Rio Miner" in (build / "index.html").read_text(encoding="utf-8")

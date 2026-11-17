@@ -18,6 +18,9 @@ QUIZ_HTML_NAME = "quiz.html"  # the old separate quiz page; no longer built
 QUIZ_JSON_NAME = "quiz.json"
 BRANDING_NAME = "branding.css"
 SCORM_SHIM_NAME = "scorm-shim.js"
+CERTIFICATE_JSON_NAME = "certificate.json"  # build-folder settings, not packaged
+CERT_LOGO_STEM = "cert-logo"
+LOGO_SUFFIXES = (".png", ".jpg", ".jpeg", ".svg", ".gif", ".webp")
 
 VIDEO_MODES = ("embed", "url", "youtube")
 
@@ -70,6 +73,88 @@ def _script_json(value) -> str:
     A JSON value is also a valid JavaScript literal.
     """
     return _script_safe(json.dumps(value))
+
+
+# ── Certificate settings ─────────────────────────────────────────────────────
+# Kept in certificate.json in the build folder so every rebuild reuses them
+# without retyping. Options on build/run update the file; it can also be
+# edited by hand.
+
+def load_certificate_settings(output_dir: Path) -> dict:
+    path = output_dir / CERTIFICATE_JSON_NAME
+    settings = {"logo": "", "signer_name": "", "signer_title": ""}
+    if path.is_file():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"{CERTIFICATE_JSON_NAME} has a typo on line {exc.lineno}, column {exc.colno}: {exc.msg}"
+            ) from exc
+        for key in settings:
+            if isinstance(data.get(key), str):
+                settings[key] = data[key].strip()
+    return settings
+
+
+def update_certificate_settings(
+    output_dir: Path,
+    logo: str | None = None,
+    signer_name: str | None = None,
+    signer_title: str | None = None,
+) -> dict:
+    """Apply any given values to certificate.json and return the settings.
+
+    None leaves a value unchanged; "" clears it. A logo is copied into the
+    build folder as cert-logo.<ext> so it ships inside the package.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    settings = load_certificate_settings(output_dir)
+    if logo is not None:
+        for old in output_dir.glob(CERT_LOGO_STEM + ".*"):
+            if old.suffix.lower() in LOGO_SUFFIXES and (not logo or Path(logo).resolve() != old.resolve()):
+                old.unlink()
+        if logo:
+            src = Path(logo)
+            if not src.is_file():
+                raise FileNotFoundError(f"Logo file not found: {logo}")
+            if src.suffix.lower() not in LOGO_SUFFIXES:
+                raise ValueError(f"Logo must be one of {', '.join(LOGO_SUFFIXES)}: {logo}")
+            dest = output_dir / (CERT_LOGO_STEM + src.suffix.lower())
+            if src.resolve() != dest.resolve():
+                shutil.copy(src, dest)
+            settings["logo"] = dest.name
+        else:
+            settings["logo"] = ""
+    if signer_name is not None:
+        settings["signer_name"] = signer_name.strip()
+    if signer_title is not None:
+        settings["signer_title"] = signer_title.strip()
+    (output_dir / CERTIFICATE_JSON_NAME).write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
+    return settings
+
+
+def certificate_files(output_dir: Path) -> List[str]:
+    """Package files the certificate needs (its logo, if one is set)."""
+    logo = load_certificate_settings(output_dir)["logo"]
+    return [logo] if logo and (output_dir / logo).is_file() else []
+
+
+def _certificate_html(output_dir: Path) -> str:
+    settings = load_certificate_settings(output_dir)
+    logo = certificate_files(output_dir)
+    logo_html = (
+        f'<img class="cert-logo" src="{_html_text(logo[0])}" alt="" />' if logo else ""
+    )
+    signer_html = ""
+    if settings["signer_name"]:
+        signer_html = (
+            '<div class="cert-sign">'
+            f'<div class="cert-sign-value">{_html_text(settings["signer_name"])}</div>'
+            f'<div class="cert-sign-label">{_html_text(settings["signer_title"] or "Signature")}</div>'
+            '</div>'
+        )
+    partial = (TEMPLATE_DIR / "certificate_partial.html").read_text(encoding="utf-8")
+    return _fill(partial, {"CERT_LOGO": logo_html, "CERT_SIGNER": signer_html})
 
 
 DEFAULT_LICENSE_MESSAGE = (
@@ -144,7 +229,7 @@ def generate_player_html(
         "VIDEO_TYPE": video_type,
         "VIDEO_EXPIRY": expiry_value,
         "LICENSE_MESSAGE_JSON": _script_json(license_message or DEFAULT_LICENSE_MESSAGE),
-        "CERTIFICATE_PARTIAL": (TEMPLATE_DIR / "certificate_partial.html").read_text(encoding="utf-8"),
+        "CERTIFICATE_PARTIAL": _certificate_html(output_dir),
     })
 
     out = output_dir / "index.html"
@@ -240,7 +325,7 @@ def manifest_extra_files(output_dir: Path) -> List[str]:
         return []
     # quiz.html and quiz.json count as standard so a manifest from an older
     # build (separate quiz page) doesn't carry them forward as "extra" files.
-    standard = set(PLAYER_FILES) | {QUIZ_HTML_NAME, QUIZ_JSON_NAME}
+    standard = set(PLAYER_FILES) | {QUIZ_HTML_NAME, QUIZ_JSON_NAME, CERTIFICATE_JSON_NAME}
     return [name for name in manifest_files(path) if name not in standard]
 
 

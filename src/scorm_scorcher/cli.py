@@ -10,10 +10,12 @@ import click
 
 from .builder import (
     QUIZ_JSON_NAME,
+    certificate_files,
     generate_manifest,
     generate_player_html,
     manifest_extra_files,
     package_basename,
+    update_certificate_settings,
 )
 from .quiz_generation import generate_quiz_from_transcript, save_quiz_to_json, save_quiz_to_xlsx
 from .scorm_packager import create_scorm_package
@@ -56,9 +58,30 @@ def _resolve_video_mode(video: str, video_mode: str | None, allow_youtube: bool)
     return "url" if is_url else "embed"
 
 
-def _embedded_files(video: str, resolved_mode: str) -> list[str]:
-    """Package files beyond the standard ones: the video itself in embed mode."""
-    return [embedded_video_name(video)] if resolved_mode == "embed" else []
+def _embedded_files(video: str, resolved_mode: str, out_dir: Path) -> list[str]:
+    """Package files beyond the standard ones: the video itself in embed mode,
+    and the certificate logo if one is set."""
+    video_files = [embedded_video_name(video)] if resolved_mode == "embed" else []
+    return video_files + certificate_files(out_dir)
+
+
+def _certificate_options(func):
+    """--logo / --signer-name / --signer-title, saved to certificate.json."""
+    func = click.option(
+        "--signer-title", default=None,
+        help="Signer's title, shown under the signature line. Saved for later builds.",
+    )(func)
+    func = click.option(
+        "--signer-name", default=None,
+        help="Name typed on the certificate's signature line (\"\" removes it). "
+             "Saved for later builds.",
+    )(func)
+    func = click.option(
+        "--logo", default=None,
+        help="Logo image (.png, .jpg, .svg…) for the top of the certificate "
+             "(\"\" removes it). Copied into the package and saved for later builds.",
+    )(func)
+    return func
 
 
 def _resolve_video_expiry(resolved_mode: str, video_expiry: str | None) -> str | None:
@@ -241,6 +264,7 @@ def quiz(input_dir: str, num_questions: int, xlsx: bool) -> None:
     help="SCORM manifest version to write. Use 'package --scorm both' to also "
          "produce a second version at packaging time.",
 )
+@_certificate_options
 def build(
     video: str,
     input_dir: str,
@@ -250,6 +274,9 @@ def build(
     video_expiry: str | None,
     license_message: str | None,
     scorm: str,
+    logo: str | None,
+    signer_name: str | None,
+    signer_title: str | None,
 ) -> None:
     """Render the HTML player and SCORM manifest."""
     try:
@@ -258,6 +285,7 @@ def build(
 
         out_dir = Path(input_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
+        update_certificate_settings(out_dir, logo, signer_name, signer_title)
 
         srt_files = list(out_dir.glob("*.srt"))
         if not srt_files:
@@ -279,7 +307,7 @@ def build(
         )
         manifest_path = generate_manifest(
             title, out_dir, include_quiz=quiz_exists, scorm_version=scorm,
-            extra_files=_embedded_files(video, resolved_mode),
+            extra_files=_embedded_files(video, resolved_mode, out_dir),
         )
 
         click.echo(f"Player:     {html_path}" + ("  (with quiz)" if quiz_exists else ""))
@@ -349,6 +377,7 @@ def package_cmd(input_dir: str, title: str, scorm: str) -> None:
     help="SCORM manifest version(s) to package. 'both' produces a separate zip "
          "for each version.",
 )
+@_certificate_options
 def run_pipeline(
     video: str,
     output: str,
@@ -364,6 +393,9 @@ def run_pipeline(
     video_expiry: str | None,
     license_message: str | None,
     scorm: str,
+    logo: str | None,
+    signer_name: str | None,
+    signer_title: str | None,
 ) -> None:
     """Full pipeline: prepare → quiz → [review] → build → package.
 
@@ -376,6 +408,7 @@ def run_pipeline(
 
         out_dir = Path(output)
         out_dir.mkdir(parents=True, exist_ok=True)
+        update_certificate_settings(out_dir, logo, signer_name, signer_title)
 
         # ── 1 / 4  PREPARE ───────────────────────────────────────────────
         click.echo("\n[1/4] Preparing video assets…")
@@ -451,7 +484,7 @@ def run_pipeline(
         # ── 4 / 4  PACKAGE ───────────────────────────────────────────────
         click.echo("\n[4/4] Packaging SCORM zip…")
         zip_paths = _package_scorm_versions(
-            title, out_dir, scorm, extra_files=_embedded_files(video, resolved_mode),
+            title, out_dir, scorm, extra_files=_embedded_files(video, resolved_mode, out_dir),
         )
 
         click.echo("\n" + "─" * 60)

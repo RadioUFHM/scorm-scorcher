@@ -111,7 +111,21 @@ lesson complete.
 
 When a learner scores 80% or higher on the quiz, a "View / Print Certificate"
 button appears on the results screen. It renders and prints (or saves as PDF)
-entirely in the browser — no server involved.
+on one landscape page entirely in the browser, with no server involved.
+
+The learner's name comes from the LMS. If the LMS supplies none (or in a local
+preview), the learner is asked to type the name for the certificate.
+
+Add a logo and a signature line when building:
+
+```
+scorm-scorcher build ... --logo my-logo.png --signer-name "Rio Miner" --signer-title "Principal"
+```
+
+These are saved in `certificate.json` in the build folder, so later builds
+reuse them without retyping (edit that file, or pass `--logo ""` /
+`--signer-name ""` to remove one). The logo is copied into the package as
+`cert-logo.<ext>`; `certificate.json` itself is never packaged.
 
 ## Quiz answer key
 

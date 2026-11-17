@@ -299,8 +299,9 @@
      pos     last playback position (resume point)
      maxw    furthest point reached by normal playback (skip-ahead limit)
      watched true once the whole video has been watched; unlocks everything
-     quiz    in-progress quiz: { cur, ans: [chosen option index per answer] } */
-  const state = { v: 2, pos: 0, maxw: 0, watched: false, quiz: null };
+     quiz    in-progress quiz: { cur, ans: [chosen option index per answer] }
+     name    name typed for the certificate when the LMS supplied none */
+  const state = { v: 2, pos: 0, maxw: 0, watched: false, quiz: null, name: "" };
   let lmsStatus = "";
   let lastSavedSec = -1;
   const SAVE_EVERY_SEC = 10;
@@ -316,6 +317,7 @@
         state.maxw = d.maxw > 0 ? d.maxw : 0;
         state.watched = !!d.watched;
         state.quiz = d.quiz || null;
+        state.name = typeof d.name === "string" ? d.name.slice(0, 80) : "";
       } else if (d.v === 1 && d.pos > 0) {
         state.pos = state.maxw = d.pos;   // saved by an older build of this page
       }
@@ -572,11 +574,11 @@
 
     if (passed) {
       renderCertificate({
-        learnerName: formatLearnerName(ScormShim.getLearnerName()),
+        learnerName: formatLearnerName(ScormShim.getLearnerName()) || state.name,
         courseTitle: courseTitle,
         scorePercent: percent,
         dateStr: new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
-      });
+      }, (name) => { state.name = name; saveState(); });
     }
 
     let reviewHtml;
@@ -619,7 +621,7 @@
   function retryQuiz() {
     current = 0;
     answers = [];
-    document.getElementById("certificate-view").classList.add("hidden");
+    hideCertificate();
     saveQuiz();
     showQuestion();
   }

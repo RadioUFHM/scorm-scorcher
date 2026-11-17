@@ -415,3 +415,47 @@ def test_quiz_script_data_is_inert_and_round_trips(tmp_path):
 
     data = re.search(r"const quizData = \((.*)\.questions \|\| \[\]\);", content)
     assert data and json.loads(data.group(1)) == quiz
+
+
+# --- Certificate: logo, signer, settings saved in certificate.json ---
+
+def test_certificate_has_no_hardcoded_organization(tmp_path):
+    content = _lesson_with_quiz(tmp_path).read_text(encoding="utf-8")
+    assert "FCI Tradecraft" not in content.split('id="certificate-view"')[1].split("</div>\n<div id=\"cert-actions\"")[0]
+    assert 'class="cert-logo"' not in content
+    assert 'class="cert-sign-value">' not in content.replace('id="cert-date"', "")
+
+
+def test_certificate_logo_and_signer_persist_across_builds(tmp_path):
+    from scorm_scorcher.builder import certificate_files, update_certificate_settings
+
+    logo = tmp_path / "My Logo.PNG"
+    logo.write_bytes(b"png")
+    build = tmp_path / "build"
+    update_certificate_settings(build, logo=str(logo), signer_name="Rio & Co", signer_title="Principal")
+    assert (build / "cert-logo.png").read_bytes() == b"png"
+    assert certificate_files(build) == ["cert-logo.png"]
+
+    update_certificate_settings(build)  # a later build with no options keeps everything
+    content = _lesson_with_quiz(build).read_text(encoding="utf-8")
+    assert '<img class="cert-logo" src="cert-logo.png" alt="" />' in content
+    assert '<div class="cert-sign-value">Rio &amp; Co</div>' in content
+    assert '<div class="cert-sign-label">Principal</div>' in content
+
+    update_certificate_settings(build, logo="", signer_name="")
+    assert certificate_files(build) == []
+    assert not (build / "cert-logo.png").exists()
+    content = _lesson_with_quiz(build).read_text(encoding="utf-8")
+    assert "cert-logo.png" not in content
+    assert "Rio &amp; Co" not in content
+
+
+def test_certificate_logo_must_exist_and_be_an_image(tmp_path):
+    from scorm_scorcher.builder import update_certificate_settings
+
+    with pytest.raises(FileNotFoundError):
+        update_certificate_settings(tmp_path / "b", logo=str(tmp_path / "missing.png"))
+    doc = tmp_path / "logo.pdf"
+    doc.write_bytes(b"x")
+    with pytest.raises(ValueError):
+        update_certificate_settings(tmp_path / "b", logo=str(doc))
