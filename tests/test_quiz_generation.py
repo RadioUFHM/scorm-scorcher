@@ -106,3 +106,47 @@ def test_claude_truncated_reply_raises_clear_error(tmp_path, monkeypatch):
 
     with pytest.raises(RuntimeError, match="cut off"):
         _generate_claude(str(md), 10, "key")
+
+
+# ── Answer shuffling ─────────────────────────────────────────────────────────
+
+def _mc(options, answer):
+    return QuizQuestion(type="multiple_choice", prompt="Q?", options=list(options), answer=answer)
+
+
+def test_shuffle_moves_the_correct_answer_around():
+    import random
+    from scorm_scorcher.quiz_generation import shuffle_options
+
+    questions = [_mc(["right", "w1", "w2", "w3"], "right") for _ in range(40)]
+    shuffle_options(questions, random.Random(1))
+    positions = {q.options.index("right") for q in questions}
+    assert len(positions) == 4  # not always first
+    for q in questions:
+        assert sorted(q.options) == sorted(["right", "w1", "w2", "w3"])
+        assert q.answer in q.options
+
+
+def test_shuffle_keeps_position_dependent_options_and_true_false():
+    import random
+    from scorm_scorcher.quiz_generation import shuffle_options
+
+    above = _mc(["a", "b", "c", "All of the above"], "All of the above")
+    tf = QuizQuestion(type="true_false", prompt="T?", answer=True)
+    shuffle_options([above, tf], random.Random(0))
+    assert above.options == ["a", "b", "c", "All of the above"]
+    assert tf.options is None
+
+
+def test_generated_heuristic_quiz_is_shuffled(tmp_path, monkeypatch):
+    import random
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    md = tmp_path / "t.md"
+    md.write_text(
+        "".join(f"- [00:00:0{i},000] one two three{i} four five six seven\n" for i in range(9)),
+        encoding="utf-8",
+    )
+    random.seed(3)
+    questions = generate_quiz_from_transcript(str(md), 9)
+    assert {q.options.index(q.answer) for q in questions} != {0}

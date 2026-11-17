@@ -1,14 +1,17 @@
-"""Quiz generation — OpenAI (primary) with a naive transcript-based fallback.
+"""Quiz generation: Claude, then OpenAI, then a built-in fallback.
 
-When OPENAI_API_KEY is set, questions are generated via GPT-4o-mini.
-Without an API key the tool falls back to a simple word-blanking heuristic
-derived from transcript lines, which is always available with no extra deps.
+Claude is used when ANTHROPIC_API_KEY is set, otherwise GPT-4o-mini when
+OPENAI_API_KEY is set. Without a key the tool falls back to a simple
+word-blanking heuristic derived from transcript lines, which needs no extra
+dependencies. Whichever generator runs, the answer options are shuffled so
+the correct answer isn't always in the same position.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import random
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -43,14 +46,35 @@ def generate_quiz_from_transcript(
     Priority: Claude (ANTHROPIC_API_KEY) → OpenAI (OPENAI_API_KEY) → naive fallback.
     """
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-    if anthropic_key:
-        return _generate_claude(md_path, num_questions, anthropic_key)
-
     openai_key = os.getenv("OPENAI_API_KEY")
-    if use_openai and openai_key:
-        return _generate_openai(md_path, num_questions, openai_key)
+    if anthropic_key:
+        questions = _generate_claude(md_path, num_questions, anthropic_key)
+    elif use_openai and openai_key:
+        questions = _generate_openai(md_path, num_questions, openai_key)
+    else:
+        questions = _generate_naive(md_path, num_questions)
+    return shuffle_options(questions)
 
-    return _generate_naive(md_path, num_questions)
+
+# Options like "All of the above" depend on their position, so a question
+# containing one keeps the order it was written in.
+_POSITIONAL = re.compile(r"\b(all|none|both|neither) of the (above|following)\b", re.I)
+
+
+def shuffle_options(questions: List[QuizQuestion], rng: Optional[random.Random] = None) -> List[QuizQuestion]:
+    """Shuffle each multiple-choice question's options in place and return the list.
+
+    Done once at generation time, so quiz.json holds the order learners see
+    and stays the file to edit. True/false questions are left alone.
+    """
+    shuffle = (rng or random).shuffle
+    for q in questions:
+        if q.type != "multiple_choice" or not q.options or len(q.options) < 2:
+            continue
+        if any(_POSITIONAL.search(str(o)) for o in q.options):
+            continue
+        shuffle(q.options)
+    return questions
 
 
 def _generate_claude(md_path: str, num_questions: int, api_key: str) -> List[QuizQuestion]:

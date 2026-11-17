@@ -81,8 +81,15 @@
     #sidebar a.locked:hover { text-decoration: none; }
     #sidebar a.locked::after { content: " \1F512"; font-size: 0.8em; }
 
+    #transcript-panel { flex: 1; min-width: 0; }
+    #transcript-tools {
+      display: flex; align-items: center; gap: 6px;
+      margin-bottom: 8px; font-size: 0.9rem; color: #444;
+    }
+    #transcript-tools input { width: 16px; height: 16px; accent-color: #0077cc; cursor: pointer; }
+    #transcript-tools label { cursor: pointer; }
     #transcript-container {
-      flex: 1;
+      position: relative;
       padding: 15px;
       background: white;
       border-radius: 8px;
@@ -97,7 +104,7 @@
     @media (max-width: 768px) {
       main { flex-direction: column; }
       #sidebar { width: 100%; order: 2; margin-top: 15px; }
-      #transcript-container { order: 1; }
+      #transcript-panel { order: 1; }
     }
 
     #license-expired-panel {
@@ -223,10 +230,16 @@
     <ul id="section-list"></ul>
   </div>
 
-  <div id="transcript-container">
-    <table id="transcript-table">
-      <tbody></tbody>
-    </table>
+  <div id="transcript-panel">
+    <div id="transcript-tools">
+      <input type="checkbox" id="autoscroll" checked />
+      <label for="autoscroll">Auto-scroll transcript</label>
+    </div>
+    <div id="transcript-container">
+      <table id="transcript-table">
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 </main>
 
@@ -690,12 +703,40 @@
   }
   updateLocks();
 
+  /* ── Transcript: highlight the current line, optionally keep it in view ── */
+  const transcriptBox = document.getElementById("transcript-container");
+  const autoscrollBox = document.getElementById("autoscroll");
+  try {
+    if (localStorage.getItem("scormScorcherAutoscroll") === "off") autoscrollBox.checked = false;
+  } catch (e) {}
+  autoscrollBox.addEventListener("change", () => {
+    try { localStorage.setItem("scormScorcherAutoscroll", autoscrollBox.checked ? "on" : "off"); } catch (e) {}
+    if (autoscrollBox.checked && activeRow) scrollToRow(activeRow);
+  });
+
+  let activeRow = null;
+
+  function scrollToRow(row) {
+    // Scroll only the transcript box (never the page or the LMS frame),
+    // keeping the current line about a third of the way down.
+    const offset = row.getBoundingClientRect().top - transcriptBox.getBoundingClientRect().top;
+    const target = transcriptBox.scrollTop + offset - transcriptBox.clientHeight / 3;
+    transcriptBox.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
+  }
+
   function highlightTranscript(t) {
-    const rows = transcriptTable.querySelectorAll("tr");
-    rows.forEach((row) => row.classList.remove("active"));
+    const rows = transcriptTable.rows;
+    let current = null;
     for (let i = 0; i < rows.length; i++) {
-      if (t >= parseFloat(rows[i].getAttribute("data-start"))) rows[i].classList.add("active");
+      if (t >= parseFloat(rows[i].getAttribute("data-start"))) current = rows[i];
+      else break;
     }
+    if (current === activeRow) return;
+    if (activeRow) activeRow.classList.remove("active");
+    activeRow = current;
+    if (!activeRow) return;
+    activeRow.classList.add("active");
+    if (autoscrollBox.checked) scrollToRow(activeRow);
   }
 
   function onTick(t) {
