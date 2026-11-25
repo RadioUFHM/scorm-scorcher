@@ -3,6 +3,64 @@
 Convert a video into a SCORM package — a video player with synced transcript, an
 auto-generated quiz, and a certificate on passing — ready to upload to an LMS.
 
+## Start here: make a SCORM package from a video
+
+Everything is already installed on this Mac. You only need to do these steps.
+
+**1. Put your video in the `Input_Video` folder** inside this project
+(`Documents/New_Code_Files_Git/scorm-scorcher/Input_Video`).
+
+**2. Open Terminal** (press Cmd+Space, type `Terminal`, press Enter).
+
+**3. Go to the project folder.** Paste this line and press Enter:
+
+```
+cd ~/Documents/New_Code_Files_Git/scorm-scorcher
+```
+
+**4. Make the package.** Paste this line, change the two parts in CAPITALS,
+and press Enter:
+
+```
+/opt/anaconda3/bin/scorm-scorcher run --video "Input_Video/YOUR VIDEO FILE.mp4" --output ./build --title "YOUR COURSE TITLE" --auto
+```
+
+For example:
+
+```
+/opt/anaconda3/bin/scorm-scorcher run --video "Input_Video/1d_What is Financial Crime.mp4" --output ./build --title "What is Financial Crime" --auto
+```
+
+- Keep the quote marks around the video name and the title.
+- The video name must match the file exactly, including capitals, spaces,
+  and `.mp4`.
+
+**5. Wait.** Turning speech into text can take 10 minutes or more for a
+long video. Leave Terminal open. It's finished when it says
+**SCORM package ready**.
+
+**6. Get your file.** The zip you upload to your LMS is in the `build`
+folder, named after your title, for example
+`build/What_is_Financial_Crime_SCORM.zip`.
+
+### Good to know
+
+- **Making another course?** Use a different output folder, such as
+  `--output ./build2`. Otherwise the new course's files get mixed in with the
+  old course's files in `build`.
+- **Want to check the quiz or chapters before packaging?** Leave `--auto` off
+  the end. The tool then stops and offers to open the chapter list and the quiz
+  so you can edit them. Answer each question with `y` or `n` and press Enter.
+- **Better quiz questions:** if an Anthropic API key is set up, Claude writes
+  the quiz. Without one, the tool still works but makes simple
+  fill-in-the-blank questions.
+- **Something went wrong?** Copy everything Terminal printed and send it to
+  whoever helps you with this tool.
+
+---
+
+The rest of this file is the full technical reference.
+
 ## Requirements
 
 - Python 3.10+
