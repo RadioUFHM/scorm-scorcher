@@ -365,3 +365,23 @@ def test_build_with_logo_ships_logo_and_package_keeps_it(tmp_path):
         assert "cert-logo.svg" in names
         assert "certificate.json" not in names
     assert "Rio Miner" in (build / "index.html").read_text(encoding="utf-8")
+
+
+def test_build_uses_brand_folder_logo_by_default(tmp_path, monkeypatch):
+    brand = tmp_path / "brand"
+    brand.mkdir()
+    (brand / "FCITlogo.png").write_bytes(b"png")
+    monkeypatch.setattr("scorm_scorcher.cli.BRAND_DIR", brand)
+    build = tmp_path / "b"
+    build.mkdir()
+    (build / "lesson.srt").write_text(SRT, encoding="utf-8")
+    video = tmp_path / "lesson.mp4"
+    video.write_bytes(b"video")
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["build", "--video", str(video), "--input", str(build), "--title", "L"])
+    assert result.exit_code == 0, result.output
+    assert "brand folder default" in result.output
+    result = runner.invoke(main, ["package", "--input", str(build), "--title", "L"])
+    assert result.exit_code == 0, result.output
+    assert "cert-logo.png" in _zip_names(next(build.glob("*.zip")))

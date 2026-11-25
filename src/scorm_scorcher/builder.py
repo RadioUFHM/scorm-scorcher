@@ -93,7 +93,22 @@ def load_certificate_settings(output_dir: Path) -> dict:
         for key in settings:
             if isinstance(data.get(key), str):
                 settings[key] = data[key].strip()
+    # Courses with no logo of their own follow the brand-folder logo. A logo
+    # chosen with --logo (or removed with --logo "") turns that off.
+    use_brand = data.get("use_brand_logo") if path.is_file() else None
+    settings["use_brand_logo"] = use_brand if isinstance(use_brand, bool) else not settings["logo"]
     return settings
+
+
+def find_brand_logo(brand_dir: Path) -> Path | None:
+    """The one image in the brand folder, or None if there are none or several."""
+    if not brand_dir.is_dir():
+        return None
+    images = sorted(
+        f for f in brand_dir.iterdir()
+        if f.is_file() and f.suffix.lower() in LOGO_SUFFIXES and not f.name.startswith(".")
+    )
+    return images[0] if len(images) == 1 else None
 
 
 def update_certificate_settings(
@@ -101,14 +116,22 @@ def update_certificate_settings(
     logo: str | None = None,
     signer_name: str | None = None,
     signer_title: str | None = None,
+    brand_logo: Path | None = None,
 ) -> dict:
     """Apply any given values to certificate.json and return the settings.
 
     None leaves a value unchanged; "" clears it. A logo is copied into the
     build folder as cert-logo.<ext> so it ships inside the package.
+    brand_logo is the default logo: it is used (and re-copied on every build,
+    so a replaced brand file reaches every course) whenever the course has
+    not been given its own logo or had its logo removed.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
     settings = load_certificate_settings(output_dir)
+    if logo is not None:
+        settings["use_brand_logo"] = False
+    elif settings["use_brand_logo"] and brand_logo is not None:
+        logo = str(brand_logo)
     if logo is not None:
         for old in output_dir.glob(CERT_LOGO_STEM + ".*"):
             if old.suffix.lower() in LOGO_SUFFIXES and (not logo or Path(logo).resolve() != old.resolve()):

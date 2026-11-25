@@ -9,8 +9,10 @@ from pathlib import Path
 import click
 
 from .builder import (
+    LOGO_SUFFIXES,
     QUIZ_JSON_NAME,
     certificate_files,
+    find_brand_logo,
     generate_manifest,
     generate_player_html,
     manifest_extra_files,
@@ -82,6 +84,24 @@ def _certificate_options(func):
              "(\"\" removes it). Copied into the package and saved for later builds.",
     )(func)
     return func
+
+
+BRAND_DIR = Path("brand")  # in the folder the command is run from
+
+
+def _apply_certificate_settings(out_dir: Path, logo, signer_name, signer_title) -> None:
+    """Save the certificate options, using the brand-folder logo as the default."""
+    brand_logo = find_brand_logo(BRAND_DIR)
+    settings = update_certificate_settings(out_dir, logo, signer_name, signer_title, brand_logo=brand_logo)
+    if logo is None and settings["use_brand_logo"]:
+        if brand_logo is not None:
+            click.echo(f"Certificate logo: {brand_logo} (brand folder default)")
+        elif BRAND_DIR.is_dir() and any(f.suffix.lower() in LOGO_SUFFIXES for f in BRAND_DIR.iterdir()):
+            click.echo(
+                f"Note: no default logo used: put exactly one image in {BRAND_DIR}/ "
+                "(it has more than one), or pass --logo.",
+                err=True,
+            )
 
 
 def _resolve_video_expiry(resolved_mode: str, video_expiry: str | None) -> str | None:
@@ -285,7 +305,7 @@ def build(
 
         out_dir = Path(input_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
-        update_certificate_settings(out_dir, logo, signer_name, signer_title)
+        _apply_certificate_settings(out_dir, logo, signer_name, signer_title)
 
         srt_files = list(out_dir.glob("*.srt"))
         if not srt_files:
@@ -408,7 +428,7 @@ def run_pipeline(
 
         out_dir = Path(output)
         out_dir.mkdir(parents=True, exist_ok=True)
-        update_certificate_settings(out_dir, logo, signer_name, signer_title)
+        _apply_certificate_settings(out_dir, logo, signer_name, signer_title)
 
         # ── 1 / 4  PREPARE ───────────────────────────────────────────────
         click.echo("\n[1/4] Preparing video assets…")

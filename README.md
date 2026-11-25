@@ -5,57 +5,84 @@ auto-generated quiz, and a certificate on passing — ready to upload to an LMS.
 
 ## Start here: make a SCORM package from a video
 
-Everything is already installed on this Mac. You only need to do these steps.
+Everything is already installed on this Mac. Follow these steps exactly.
+
+### One-time setup: the API key (do this once, ever)
+
+The API key lets Claude write the quiz questions. Without it, you get simple
+fill-in-the-blank questions instead.
+
+1. Go to https://console.anthropic.com → **API Keys** → **Create Key**. Copy
+   the key right away: the Console only shows the full key once.
+2. Open Terminal (press Cmd+Space, type `Terminal`, press Enter), paste this
+   line with your key in place of `YOUR-KEY-HERE`, and press Enter:
+
+   ```
+   echo 'export ANTHROPIC_API_KEY="YOUR-KEY-HERE"' >> ~/.zshrc
+   ```
+
+3. Close Terminal. Every Terminal window you open from now on has the key.
+
+### Make a course (every time)
 
 **1. Put your video in the `Input_Video` folder** inside this project
 (`Documents/New_Code_Files_Git/scorm-scorcher/Input_Video`).
 
-**2. Open Terminal** (press Cmd+Space, type `Terminal`, press Enter).
-
-**3. Go to the project folder.** Paste this line and press Enter:
+**2. Open Terminal**, paste this line, and press Enter:
 
 ```
 cd ~/Documents/New_Code_Files_Git/scorm-scorcher
 ```
 
-**4. Make the package.** Paste this line, change the two parts in CAPITALS,
-and press Enter:
+**3. Paste this line, change the parts in CAPITALS, and press Enter:**
 
 ```
-/opt/anaconda3/bin/scorm-scorcher run --video "Input_Video/YOUR VIDEO FILE.mp4" --output ./build --title "YOUR COURSE TITLE" --auto
+/opt/anaconda3/bin/scorm-scorcher run --video "Input_Video/YOUR VIDEO FILE.mp4" --output "output_folder/YOUR COURSE TITLE" --title "YOUR COURSE TITLE" --auto
 ```
 
 For example:
 
 ```
-/opt/anaconda3/bin/scorm-scorcher run --video "Input_Video/1d_What is Financial Crime.mp4" --output ./build --title "What is Financial Crime" --auto
+/opt/anaconda3/bin/scorm-scorcher run --video "Input_Video/1d_What is Financial Crime.mp4" --output "output_folder/What is Financial Crime" --title "What is Financial Crime" --auto
 ```
 
-- Keep the quote marks around the video name and the title.
+- Keep the quote marks.
 - The video name must match the file exactly, including capitals, spaces,
   and `.mp4`.
+- Put the course title in both places, so each course gets its own folder
+  inside `output_folder`.
 
-**5. Wait.** Turning speech into text can take 10 minutes or more for a
-long video. Leave Terminal open. It's finished when it says
-**SCORM package ready**.
+**4. Wait.** Turning speech into text can take 10 minutes or more for a
+long video. Leave Terminal open. Look for these lines:
 
-**6. Get your file.** The zip you upload to your LMS is in the `build`
-folder, named after your title, for example
-`build/What_is_Financial_Crime_SCORM.zip`.
+- `Using Claude (ANTHROPIC_API_KEY found).` means the quiz is AI-written.
+  If it says `No API key found`, redo the one-time setup above.
+- `SCORM package ready` means it's finished.
 
-### Good to know
+**5. Get your file.** The zip to upload to your LMS is in
+`output_folder/YOUR COURSE TITLE/`, for example
+`output_folder/What is Financial Crime/What_is_Financial_Crime_SCORM.zip`.
 
-- **Making another course?** Use a different output folder, such as
-  `--output ./build2`. Otherwise the new course's files get mixed in with the
-  old course's files in `build`.
-- **Want to check the quiz or chapters before packaging?** Leave `--auto` off
-  the end. The tool then stops and offers to open the chapter list and the quiz
-  so you can edit them. Answer each question with `y` or `n` and press Enter.
-- **Better quiz questions:** if an Anthropic API key is set up, Claude writes
-  the quiz. Without one, the tool still works but makes simple
-  fill-in-the-blank questions.
-- **Something went wrong?** Copy everything Terminal printed and send it to
-  whoever helps you with this tool.
+### Preview the course in your browser (optional)
+
+Paste these two lines into Terminal, one at a time (change the CAPITALS):
+
+```
+cd ~/"Documents/New_Code_Files_Git/scorm-scorcher/output_folder/YOUR COURSE TITLE"
+```
+
+```
+npx --yes http-server -p 8000
+```
+
+Then open http://localhost:8000/ in your browser. To try the quiz without
+watching the whole video, open http://localhost:8000/?unlock instead. When
+you're done, go back to Terminal and press **Ctrl+C**.
+
+### If something goes wrong
+
+Copy everything Terminal printed and send it to whoever helps you with this
+tool.
 
 ---
 
@@ -184,6 +211,14 @@ These are saved in `certificate.json` in the build folder, so later builds
 reuse them without retyping (edit that file, or pass `--logo ""` /
 `--signer-name ""` to remove one). The logo is copied into the package as
 `cert-logo.<ext>`; `certificate.json` itself is never packaged.
+
+**Default logo for every course:** put one image (for example
+`FCITlogo.png`) in a `brand` folder inside the folder you run the command
+from (this project folder). Every course that hasn't been given its own logo
+uses it, and the build prints `Certificate logo: brand/... (brand folder
+default)`. Replace the file in `brand` and the next build of each course picks
+up the new logo. `--logo other.png` overrides it for one course, and `--logo ""`
+leaves the logo off that course. The `brand` folder is not committed to git.
 
 ## Quiz answer key
 

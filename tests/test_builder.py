@@ -459,3 +459,59 @@ def test_certificate_logo_must_exist_and_be_an_image(tmp_path):
     doc.write_bytes(b"x")
     with pytest.raises(ValueError):
         update_certificate_settings(tmp_path / "b", logo=str(doc))
+
+
+def test_brand_logo_is_the_default_and_follows_brand_file(tmp_path):
+    from scorm_scorcher.builder import certificate_files, find_brand_logo, update_certificate_settings
+
+    brand = tmp_path / "brand"
+    brand.mkdir()
+    (brand / "FCITlogo.png").write_bytes(b"v1")
+    default = find_brand_logo(brand)
+    build = tmp_path / "build"
+
+    update_certificate_settings(build, brand_logo=default)
+    assert certificate_files(build) == ["cert-logo.png"]
+    assert (build / "cert-logo.png").read_bytes() == b"v1"
+
+    (brand / "FCITlogo.png").write_bytes(b"v2")  # replaced brand logo reaches the course
+    update_certificate_settings(build, brand_logo=default)
+    assert (build / "cert-logo.png").read_bytes() == b"v2"
+
+    update_certificate_settings(build, logo="", brand_logo=default)  # removed stays removed
+    update_certificate_settings(build, brand_logo=default)
+    assert certificate_files(build) == []
+
+
+def test_own_logo_beats_brand_logo_including_older_courses(tmp_path):
+    from scorm_scorcher.builder import update_certificate_settings
+
+    own = tmp_path / "own.svg"
+    own.write_bytes(b"own")
+    brand = tmp_path / "brand.png"
+    brand.write_bytes(b"brand")
+    build = tmp_path / "build"
+    update_certificate_settings(build, logo=str(own), brand_logo=brand)
+    update_certificate_settings(build, brand_logo=brand)
+    assert (build / "cert-logo.svg").read_bytes() == b"own"
+    assert not (build / "cert-logo.png").exists()
+
+    # A course saved before brand logos existed (no use_brand_logo key) keeps its logo.
+    old = tmp_path / "old"
+    old.mkdir()
+    (old / "cert-logo.svg").write_bytes(b"old")
+    (old / "certificate.json").write_text('{"logo": "cert-logo.svg", "signer_name": "", "signer_title": ""}')
+    update_certificate_settings(old, brand_logo=brand)
+    assert (old / "cert-logo.svg").read_bytes() == b"old"
+
+
+def test_find_brand_logo_needs_exactly_one_image(tmp_path):
+    from scorm_scorcher.builder import find_brand_logo
+
+    assert find_brand_logo(tmp_path / "missing") is None
+    (tmp_path / "notes.txt").write_text("x")
+    assert find_brand_logo(tmp_path) is None
+    (tmp_path / "a.png").write_bytes(b"a")
+    assert find_brand_logo(tmp_path) == tmp_path / "a.png"
+    (tmp_path / "b.jpg").write_bytes(b"b")
+    assert find_brand_logo(tmp_path) is None
